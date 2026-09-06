@@ -1,0 +1,117 @@
+# =====================================================================
+# fly.toml — how Fly.io runs this backend
+# =====================================================================
+#
+# WHAT THIS FILE IS
+# Fly.io reads this to decide how to build the application, where to run it,
+# how many copies, and how to tell whether it is healthy. `fly launch`
+# generates a starting version; this one is filled in deliberately.
+#
+# WHAT IS NOT IN THIS FILE
+# Secrets. The Gemini key, the database password and the AWS identifiers are
+# set with `fly secrets set`, which stores them encrypted and injects them at
+# runtime. This file is committed to version control; secrets must never be.
+# =====================================================================
+
+# Must be unique across all of Fly.io. Change it to something of your own.
+app = "ai-dungeon-master-api"
+
+# WHICH REGION, AND WHY IT MATTERS MORE THAN IT LOOKS
+#
+# Pick the Fly region physically closest to the AWS region hosting your
+# database. Every single database query pays the round trip between them.
+#
+# London to eu-west-2 (London) is about 2ms. London to us-east-1 (Virginia) is
+# about 75ms. A page doing ten queries is 20ms in one case and 750ms in the
+# other — the difference between an application that feels instant and one that
+# feels broken, from nothing but a dropdown choice.
+#
+#   lhr = London      -> pair with AWS eu-west-2
+#   iad = Virginia    -> pair with AWS us-east-1
+#   ams = Amsterdam   -> pair with AWS eu-west-1
+primary_region = "lhr"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  # Non-secret configuration only. Anything sensitive goes in `fly secrets set`.
+  APP_ENV = "production"
+  LOG_FORMAT = "json"
+  LOG_LEVEL = "INFO"
+  LOG_REDACTION_ENABLED = "true"
+  AUTH_MODE = "real"
+  ENCRYPTION_PROVIDER = "aws_kms"
+  REPOSITORY_BACKEND = "mysql"
+  COOKIE_SECURE = "true"
+  STT_ENABLED = "true"
+  STT_MODEL_SIZE = "base"
+  STT_DEVICE = "cpu"
+  STT_COMPUTE_TYPE = "int8"
+  GEMINI_BASE_URL = "https://generativelanguage.googleapis.com"
+  GEMINI_MODEL_ID = "gemini-3.5-flash"
+  SCRUB_OUTBOUND_PROMPTS = "true"
+
+  # These two must match your real domains. Both must sit under one parent
+  # domain or cross-site request forgery protection cannot work at all —
+  # see backend/docs/SECURITY.md.
+  CORS_ALLOWED_ORIGINS = "https://app.example.com"
+  COOKIE_DOMAIN = ".example.com"
+
+  # How the application proves its identity to AWS without a stored key.
+  # See docs/DEPLOY_CROSS_CUTTING.md.
+  AWS_ROLE_ARN = "arn:aws:iam::000000000000:role/dungeon-master-app"
+  AWS_WEB_IDENTITY_TOKEN_FILE = "/.fly/oidc_token"
+  AWS_REGION = "eu-west-2"
+
+[http_service]
+  internal_port = 8000
+  # Fly redirects plain HTTP to HTTPS at its edge, so the application never
+  # sees an unencrypted request.
+  force_https = true
+
+  # Scale to zero when idle. The application starts in a couple of seconds, so
+  # the first visitor after a quiet period waits slightly; in exchange you pay
+  # nothing overnight. Set to false once real people use it at unpredictable
+  # hours.
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [http_service.concurrency]
+    # Requests, not connections. A Gemini call is mostly waiting on the
+    # network, so one machine can hold many at once — but each concurrent
+    # login also costs 64 MB for Argon2id hashing, which is what bounds this.
+    type = "requests"
+    soft_limit = 40
+    hard_limit = 60
+
+# Two checks, because they answer different questions and conflating them
+# causes outages.
+#
+# Liveness asks "is the process running?" — if it fails, restart the machine.
+# It deliberately touches nothing external, so a bad minute at Google does not
+# cause a restart loop.
+[[http_service.checks]]
+  interval = "30s"
+  timeout = "5s"
+  grace_period = "20s"
+  method = "GET"
+  path = "/health"
+
+# Readiness asks "can it serve requests?". A failure here means stop sending
+# traffic — but do NOT restart, because restarting will not fix a missing key.
+[[http_service.checks]]
+  interval = "60s"
+  timeout = "10s"
+  grace_period = "30s"
+  method = "GET"
+  path = "/health/ready"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  # 1 GB, not the 256 MB default. Two things need it: the speech model holds
+  # about 1 GB while transcribing, and Argon2id takes 64 MB per concurrent
+  # login. At 256 MB the machine is killed the first time somebody speaks.
+  memory = "1gb"
+  cpus = 1

@@ -1,0 +1,182 @@
+<div class="play">
+  <!--
+    The conversation.
+
+    `aria-live="polite"` means a screen reader announces new messages as they
+    arrive, without interrupting whatever it is currently saying. Without it, a
+    blind player would have no idea the Dungeon Master had replied.
+  -->
+  <div class="transcript" role="log" aria-live="polite" aria-label="Conversation with the Dungeon Master">
+    @if (isEmpty() && !waiting()) {
+      <div class="opening">
+        <h1>The lantern is lit.</h1>
+        <p class="page__lead">
+          Describe what your character does and the Dungeon Master will narrate what happens.
+          Speak or type — it makes no difference to the story.
+        </p>
+
+        <div class="suggestions">
+          <p class="small muted">Not sure how to start? Try one of these:</p>
+          @for (suggestion of [
+            'I push open the chapel door and hold up the lantern.',
+            'I ask the innkeeper what everyone in the village is refusing to talk about.',
+            'I want to make a character first — help me build one.'
+          ]; track suggestion) {
+            <button type="button" class="suggestion" (click)="useSuggestion(suggestion)">
+              {{ suggestion }}
+            </button>
+          }
+        </div>
+      </div>
+    }
+
+    @for (line of lines(); track line.id) {
+      <article
+        class="line line--{{ line.role }}"
+        [class.line--pending]="line.pending"
+      >
+        <p class="line__who">
+          {{ line.role === 'player' ? 'You' : 'Dungeon Master' }}
+          @if (line.inputMode === 'voice') {
+            <span class="line__mode" title="Spoken">&#127908;</span>
+          }
+        </p>
+        <div class="line__body">{{ line.content }}</div>
+      </article>
+    }
+
+    @if (waiting()) {
+      <article class="line line--dungeon_master">
+        <p class="line__who">Dungeon Master</p>
+        <div class="thinking" aria-label="The Dungeon Master is thinking">
+          <span></span><span></span><span></span>
+        </div>
+      </article>
+    }
+
+    <div #transcriptEnd></div>
+  </div>
+
+  <!-- Failures -->
+  @if (error(); as message) {
+    <div class="play__notice">
+      <app-banner kind="danger" title="That did not work">
+        <p style="margin: 0 0 8px">{{ message }}</p>
+        @if (correlationId(); as id) {
+          <p class="small" style="margin: 0">
+            If you report this, quote: <code class="mono">{{ id }}</code>
+            <br />
+            <span class="muted">
+              That identifier is all we need to find out what happened — nobody has to read
+              your campaign to investigate it.
+            </span>
+          </p>
+        }
+        <button type="button" class="btn btn--ghost btn--sm" style="margin-top: 8px" (click)="dismissError()">
+          Dismiss
+        </button>
+      </app-banner>
+    </div>
+  }
+
+  @if (voice.error(); as voiceError) {
+    <div class="play__notice">
+      <app-banner kind="warning" title="Voice input">
+        <p style="margin: 0">{{ voiceError }}</p>
+      </app-banner>
+    </div>
+  }
+
+  <!-- The composer -->
+  <div class="composer">
+    @if (voice.isRecording()) {
+      <div class="recording" role="status">
+        <span class="recording__dot" aria-hidden="true"></span>
+        <span>Listening… {{ recordingTime() }}</span>
+        <span class="spacer"></span>
+        <button type="button" class="btn btn--ghost btn--sm" (click)="cancelRecording()">Cancel</button>
+        <button type="button" class="btn btn--primary btn--sm" (click)="toggleRecording()">Done</button>
+      </div>
+    } @else {
+      <div class="composer__row">
+        <label class="visually-hidden" for="message">What do you do?</label>
+        <textarea
+          id="message"
+          class="textarea composer__input"
+          rows="2"
+          placeholder="What do you do?"
+          [ngModel]="draft()"
+          (ngModelChange)="draft.set($event)"
+          (keydown)="onKeydown($event)"
+          [disabled]="waiting() || voice.isTranscribing()"
+        ></textarea>
+
+        @if (voiceAvailable()) {
+          <button
+            type="button"
+            class="btn composer__mic"
+            (click)="toggleRecording()"
+            [disabled]="waiting() || voice.isTranscribing()"
+            [attr.aria-label]="voice.isTranscribing() ? 'Transcribing your recording' : 'Record a message'"
+          >
+            @if (voice.isTranscribing()) {
+              <span aria-hidden="true">…</span>
+            } @else {
+              <span aria-hidden="true">&#127908;</span>
+            }
+          </button>
+        }
+
+        <button
+          type="button"
+          class="btn btn--primary composer__send"
+          (click)="send('typed')"
+          [disabled]="!canSend()"
+        >
+          Send
+        </button>
+      </div>
+
+      <p class="composer__hint small muted">
+        Press Enter to send, Shift+Enter for a new line.
+        @if (voiceAvailable()) {
+          Speech is transcribed on our own server, never sent to Google.
+        }
+      </p>
+    }
+  </div>
+
+  <!-- What the last turn cost, and what left the building -->
+  @if (usage(); as tokenUsage) {
+    <div class="meta small muted">
+      <span>{{ tokenUsage.model_id }}</span>
+      <span>·</span>
+      <span>{{ tokenUsage.tokens_in }} in / {{ tokenUsage.tokens_out }} out</span>
+      <span>·</span>
+      <span>{{ tokenUsage.latency_ms }}ms</span>
+      @if (scrubbed()) {
+        <span>·</span>
+        <span class="scrub-note" title="Personal details were replaced before this was sent to Google">
+          &#128274; personal details removed before sending
+        </span>
+      }
+      <span class="spacer"></span>
+      <label class="debug-toggle small">
+        <input
+          type="checkbox"
+          [checked]="debugCapture()"
+          (change)="toggleDebugCapture($any($event.target).checked)"
+        />
+        Help us debug this session
+      </label>
+    </div>
+    @if (debugCapture()) {
+      <p class="small muted meta__explain">
+        While this is on, the exact text sent to and from the AI is stored — encrypted with
+        your own key — for 48 hours, then deleted automatically. It can only be read through
+        a support process that records who looked and why, and tells you about it in
+        <a routerLink="/account">your account activity</a>.
+      </p>
+    }
+  }
+</div>

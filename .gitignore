@@ -1,0 +1,37 @@
+# --- Secrets: never commit these ---
+# A ".env" file holds configuration values that are private to your machine,
+# such as your Gemini API key. Committing one publishes your key to anyone who
+# can read the repository.
+.env
+.env.*
+!.env.example
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+dist/
+build/
+*.egg-info/
+
+# --- Node / Angular ---
+node_modules/
+/frontend/dist/
+/frontend/.angular/
+/frontend/coverage/
+
+# --- Editors and operating system junk ---
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# --- Local model caches (speech-to-text weights are large) ---
+.cache/
+models/

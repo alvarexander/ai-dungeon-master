@@ -1,0 +1,90 @@
+# =====================================================================
+# docker-compose.yml — run the whole application with one command
+# =====================================================================
+#
+# WHAT THIS IS FOR
+# Starts the backend and the frontend together, configured to talk to each
+# other, with no Python, Node or uv installed on your machine — only Docker.
+#
+#   docker compose up --build      start both (first run builds; it is slow)
+#   docker compose up              start both again (fast)
+#   docker compose down            stop both
+#   docker compose logs -f api     watch the backend's logs
+#
+# Then open http://localhost:4200
+#
+# WHAT THIS IS NOT FOR
+# Production. The production path is different by design: the frontend goes to
+# Hostinger as plain files and the backend to Fly.io as a container. See
+# SYSTEM_GUIDE.md. This file is for running everything locally in one step, and
+# for proving the images build.
+#
+# BEFORE THE FIRST RUN
+#   cp backend/.env.example backend/.env
+# then paste your Gemini API key into backend/.env. The key is read at runtime
+# and is never baked into an image.
+# =====================================================================
+
+services:
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: dungeon-master-api
+    ports:
+      # host:container. The browser reaches the backend at localhost:8000.
+      - "8000:8000"
+    env_file:
+      # Secrets are read from this file at runtime, never copied into the
+      # image. .dockerignore also excludes it from the build context, so it
+      # cannot be baked in by accident.
+      - ./backend/.env
+    environment:
+      # Overrides for running in a container. These deliberately repeat a few
+      # values from .env, because container networking differs from running
+      # directly on your machine.
+      APP_ENV: local
+      HOST: 0.0.0.0
+      # 0.0.0.0 rather than 127.0.0.1: inside a container, 127.0.0.1 means "this
+      # container only", so the port mapping above would reach nothing.
+      CORS_ALLOWED_ORIGINS: http://localhost:4200
+      REPOSITORY_BACKEND: memory
+      LOG_FORMAT: console
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      # Generous, because the first start loads the speech model.
+      start_period: 60s
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: dungeon-master-web
+    ports:
+      - "4200:8080"
+    volumes:
+      # Mount the configuration over the one baked into the image, so the
+      # backend address can be changed by editing a file and restarting,
+      # with no rebuild. This is the same property the real deployment relies
+      # on: build once, configure anywhere.
+      - ./frontend/public/config.json:/usr/share/nginx/html/config.json:ro
+    depends_on:
+      api:
+        # Wait until the backend answers its health check, so the first page
+        # load does not race the backend's startup.
+        condition: service_healthy
+    restart: unless-stopped
+
+# A NOTE ON THE ABSENT DATABASE
+#
+# There is deliberately no MySQL service here. Phase 1 runs against an
+# in-memory store — with the real encryption code, against a development key —
+# so there is nothing for a database to do yet.
+#
+# When Phase 2 arrives, add a `db` service using the `mysql:8.0` image, mount
+# `backend/migrations/` into `/docker-entrypoint-initdb.d/` so the schema is
+# created on first start, and set REPOSITORY_BACKEND=mysql above.

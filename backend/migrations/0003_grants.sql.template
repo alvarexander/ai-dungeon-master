@@ -1,0 +1,94 @@
+-- =====================================================================
+-- 0003 — Database permissions (TEMPLATE)
+-- =====================================================================
+--
+-- This is a .template file, not a migration, because it contains a username
+-- and password that are specific to your deployment. Copy it, fill in the two
+-- placeholders, run it once by hand, and do NOT commit the filled-in copy.
+--
+-- WHAT A GRANT IS
+-- MySQL logins are separate from your operating system login. A "grant" says
+-- which operations a given MySQL login may perform on which tables. The
+-- principle applied here is "least privilege": give the application exactly
+-- the rights it needs to do its job and nothing more, so that a bug or a
+-- compromise has a small blast radius.
+--
+-- HOW TO USE
+--   1. Replace {{APP_PASSWORD}} with a random 32+ character password.
+--      Generate one with:  python3 -c "import secrets; print(secrets.token_urlsafe(32))"
+--   2. Replace {{MIGRATOR_PASSWORD}} the same way, with a DIFFERENT value.
+--   3. Store both in AWS Secrets Manager, not in a file.
+--   4. Run this against your RDS instance as the master user.
+-- =====================================================================
+
+-- ---------------------------------------------------------------------
+-- The application role. This is what the Fly.io backend connects as.
+-- REQUIRE SSL means MySQL refuses an unencrypted connection outright — the
+-- database will not accept a plaintext session even if the client asks for one.
+-- ---------------------------------------------------------------------
+CREATE USER IF NOT EXISTS 'dm_app'@'%'
+  IDENTIFIED BY '{{APP_PASSWORD}}'
+  REQUIRE SSL;
+
+-- Operational tables: read and write, but no deleting history.
+GRANT SELECT, INSERT, UPDATE ON dungeon_master.users              TO 'dm_app'@'%';
+GRANT SELECT, INSERT, UPDATE, DELETE ON dungeon_master.user_analytics_map TO 'dm_app'@'%';
+GRANT SELECT, INSERT, UPDATE, DELETE ON dungeon_master.user_sessions      TO 'dm_app'@'%';
+GRANT SELECT, INSERT, UPDATE, DELETE ON dungeon_master.campaigns          TO 'dm_app'@'%';
+GRANT SELECT, INSERT, UPDATE, DELETE ON dungeon_master.characters         TO 'dm_app'@'%';
+GRANT SELECT, INSERT, UPDATE, DELETE ON dungeon_master.game_sessions      TO 'dm_app'@'%';
+GRANT SELECT, INSERT, UPDATE, DELETE ON dungeon_master.messages           TO 'dm_app'@'%';
+GRANT SELECT, INSERT           ON dungeon_master.gemini_calls    TO 'dm_app'@'%';
+GRANT SELECT, INSERT, DELETE   ON dungeon_master.debug_captures  TO 'dm_app'@'%';
+
+-- Append-only audit tables. Note the deliberate absence of UPDATE and DELETE:
+-- the application physically cannot rewrite or erase its own audit trail.
+GRANT SELECT, INSERT ON dungeon_master.support_access_grants TO 'dm_app'@'%';
+GRANT SELECT, INSERT ON dungeon_master.account_activity_log  TO 'dm_app'@'%';
+
+-- Analytics: read the aggregates, but NO direct insert into analytics_events.
+-- The only way in is sp_analytics_record, which enforces the enum allowlist.
+-- This is the "reject unknown fields at write time" rule enforced by the
+-- database rather than trusted to application code.
+GRANT SELECT ON dungeon_master.analytics_events           TO 'dm_app'@'%';
+GRANT SELECT ON dungeon_master.analytics_daily_aggregates TO 'dm_app'@'%';
+GRANT SELECT ON dungeon_master.analytics_retention_cohorts TO 'dm_app'@'%';
+
+-- Rate limiting goes through its procedure too.
+GRANT SELECT ON dungeon_master.rate_limit_counters TO 'dm_app'@'%';
+
+-- The procedures the application is allowed to call.
+GRANT EXECUTE ON PROCEDURE dungeon_master.sp_rate_limit_hit          TO 'dm_app'@'%';
+GRANT EXECUTE ON PROCEDURE dungeon_master.sp_user_find_by_email_bidx TO 'dm_app'@'%';
+GRANT EXECUTE ON PROCEDURE dungeon_master.sp_user_find_by_username   TO 'dm_app'@'%';
+GRANT EXECUTE ON PROCEDURE dungeon_master.sp_user_crypto_shred       TO 'dm_app'@'%';
+GRANT EXECUTE ON PROCEDURE dungeon_master.sp_session_transcript_page TO 'dm_app'@'%';
+GRANT EXECUTE ON PROCEDURE dungeon_master.sp_message_append          TO 'dm_app'@'%';
+GRANT EXECUTE ON PROCEDURE dungeon_master.sp_analytics_record        TO 'dm_app'@'%';
+GRANT EXECUTE ON PROCEDURE dungeon_master.sp_support_grant_open      TO 'dm_app'@'%';
+GRANT EXECUTE ON PROCEDURE dungeon_master.sp_support_grant_check     TO 'dm_app'@'%';
+
+-- ---------------------------------------------------------------------
+-- The maintenance role. Used by the nightly scheduled job only.
+-- ---------------------------------------------------------------------
+CREATE USER IF NOT EXISTS 'dm_maintenance'@'%'
+  IDENTIFIED BY '{{MIGRATOR_PASSWORD}}'
+  REQUIRE SSL;
+
+GRANT EXECUTE ON PROCEDURE dungeon_master.sp_analytics_rollup_day   TO 'dm_maintenance'@'%';
+GRANT EXECUTE ON PROCEDURE dungeon_master.sp_analytics_purge_raw    TO 'dm_maintenance'@'%';
+GRANT EXECUTE ON PROCEDURE dungeon_master.sp_debug_captures_expire  TO 'dm_maintenance'@'%';
+GRANT EXECUTE ON PROCEDURE dungeon_master.sp_rate_limit_prune       TO 'dm_maintenance'@'%';
+GRANT SELECT, INSERT, UPDATE ON dungeon_master.analytics_daily_aggregates  TO 'dm_maintenance'@'%';
+GRANT SELECT, INSERT, UPDATE ON dungeon_master.analytics_retention_cohorts TO 'dm_maintenance'@'%';
+GRANT SELECT, DELETE ON dungeon_master.analytics_events TO 'dm_maintenance'@'%';
+
+-- ---------------------------------------------------------------------
+-- Deliberately NOT created here: a role that can run migrations.
+-- Schema changes are run with the RDS master credentials, by you, by hand,
+-- and those credentials are not stored on the application server at all.
+-- If the running application cannot ALTER TABLE, then neither can anyone who
+-- compromises it.
+-- ---------------------------------------------------------------------
+
+FLUSH PRIVILEGES;

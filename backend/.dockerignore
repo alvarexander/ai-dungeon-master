@@ -1,0 +1,24 @@
+# Files that must never enter the container image.
+#
+# The first entry is the important one: .env holds your real API key and
+# encryption secrets. A container image is copied to a registry and pulled onto
+# machines, so anything baked into it should be assumed public. Production
+# secrets are injected at runtime with `fly secrets set` instead.
+.env
+.env.*
+!.env.example
+
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+tests/
+docs/
+.git/
+.gitignore
+*.md
+.DS_Store

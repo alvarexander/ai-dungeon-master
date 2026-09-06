@@ -1,0 +1,5 @@
+{
+  "_comment": "Runtime configuration. Read when the page loads, NOT baked in at build time. See src/app/core/app-config.ts for why. Edit this file on the server to point a deployed build at a different backend, with no rebuild.",
+  "apiBaseUrl": "http://localhost:8000",
+  "environment": "local"
+}

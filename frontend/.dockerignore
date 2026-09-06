@@ -1,0 +1,11 @@
+# Kept out of the build context, so the image builds faster and stays clean.
+node_modules/
+dist/
+.angular/
+coverage/
+.git/
+.gitignore
+*.md
+docs/
+.DS_Store
+.vscode/

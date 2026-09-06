@@ -1,0 +1,119 @@
+# =====================================================================
+# pyproject.toml — the backend's definition
+#
+# WHAT THIS FILE IS
+# Python projects describe themselves in one file called pyproject.toml. It
+# lists the project's name, which version of Python it needs, and which
+# third-party libraries it depends on. The `uv` tool reads this file and
+# installs exactly those libraries into an isolated folder called a "virtual
+# environment", so this project's libraries never collide with another
+# project's.
+# =====================================================================
+[project]
+name = "ai-dungeon-master-backend"
+version = "0.1.0"
+description = "Backend service for the AI Dungeon Master: Gemini-backed game loop, envelope encryption, and privacy-preserving telemetry."
+requires-python = ">=3.12"
+
+dependencies = [
+    # The web framework. Handles receiving HTTP requests and sending replies,
+    # and generates the Swagger documentation at /docs automatically.
+    "fastapi>=0.115",
+    # The server that actually listens on a network port and hands requests
+    # to FastAPI. FastAPI is the application; uvicorn is the engine under it.
+    "uvicorn[standard]>=0.32",
+    # Data validation. Declares the exact shape of every request and response,
+    # and rejects anything that does not match before it reaches our code.
+    "pydantic>=2.9",
+    # Validates that an email address is actually well formed. Pydantic's
+    # EmailStr type needs it; without it the app fails at import time.
+    "email-validator>=2.2",
+    # Reads configuration from environment variables into a validated object.
+    "pydantic-settings>=2.6",
+    # An HTTP client that can make outbound requests without blocking. Used
+    # for calls to Gemini, wrapped in our own SSRF protection.
+    "httpx>=0.27",
+    # Structured logging: log lines are JSON objects rather than sentences,
+    # so they can be filtered and searched. Our redaction filter plugs in here.
+    "structlog>=24.4",
+    # Password hashing with Argon2id.
+    "argon2-cffi>=23.1",
+    # AES-256-GCM encryption and HMAC-SHA256 fingerprints.
+    "cryptography>=43.0",
+    # Lets FastAPI accept uploaded files, which is how voice audio arrives.
+    "python-multipart>=0.0.12",
+]
+
+[project.optional-dependencies]
+# Speech-to-text. Separated out because these are large downloads (a few
+# hundred megabytes) and the application runs perfectly well without them —
+# typed input keeps working and the voice endpoint returns a clear message.
+# Install with:  uv sync --extra voice
+voice = [
+    "faster-whisper>=1.0.3",
+]
+
+# AWS integration for Phase 2: KMS key wrapping and Secrets Manager.
+# Not needed to run locally.
+aws = [
+    "boto3>=1.35",
+]
+
+# The database layer, for Phase 2. Phase 1 uses an in-memory store.
+db = [
+    "sqlalchemy[asyncio]>=2.0",
+    "aiomysql>=0.2",
+    "alembic>=1.13",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "pytest-cov>=6.0",
+    "ruff>=0.7",
+    "mypy>=1.13",
+    # Generates realistic fake people for the local seed script. Never real data.
+    "faker>=30.0",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+# E,F = errors and undefined names. I = import sorting. B = likely bugs.
+# UP = modernise old syntax. S = security lint (bandit rules).
+# D = docstrings: every function must have one, per the project conventions.
+select = ["E", "F", "I", "B", "UP", "S", "D"]
+ignore = [
+    "D203",  # conflicts with D211, which we prefer
+    "D213",  # conflicts with D212, which we prefer
+    "E501",  # line length is handled by the formatter
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests may use `assert`, which the security linter flags in production code.
+"tests/*" = ["S101", "D103"]
+"scripts/*" = ["S101"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_unused_ignores = true
+disallow_untyped_defs = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+addopts = "-q --strict-markers"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]

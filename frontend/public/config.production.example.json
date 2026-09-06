@@ -1,0 +1,5 @@
+{
+  "_comment": "Copy this over config.json when deploying to Hostinger, with your real domain filled in. Both hosts MUST share a parent domain or cross-site request forgery protection cannot work — see backend/docs/SECURITY.md.",
+  "apiBaseUrl": "https://api.yourdomain.com",
+  "environment": "production"
+}

@@ -1,0 +1,27 @@
+/* Shared styling for the three authentication screens. */
+:host {
+  display: block;
+  padding: var(--space-7) var(--space-5) var(--space-8);
+}
+
+.auth {
+  max-width: 440px;
+  margin: 0 auto;
+}
+
+.auth__header {
+  text-align: center;
+  margin-bottom: var(--space-5);
+
+  h1 { margin-bottom: var(--space-2); }
+}
+
+.auth__card { margin-bottom: var(--space-4); }
+
+.auth__footer {
+  text-align: center;
+  color: var(--ink-muted);
+  font-size: 0.9rem;
+}
+
+.auth__notice { margin-bottom: var(--space-4); }
