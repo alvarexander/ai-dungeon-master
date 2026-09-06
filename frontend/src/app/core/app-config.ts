@@ -27,19 +27,19 @@ import { InjectionToken } from '@angular/core';
 
 /** The shape of `public/config.json`. */
 export interface AppConfig {
-  /**
-   * Where the backend lives, with no trailing slash.
-   * For example `http://localhost:8000` locally, or
-   * `https://api.yourdomain.com` in production.
-   */
-  apiBaseUrl: string;
+    /**
+     * Where the backend lives, with no trailing slash.
+     * For example `http://localhost:8000` locally, or
+     * `https://api.yourdomain.com` in production.
+     */
+    apiBaseUrl: string;
 
-  /**
-   * Which environment this is. The interface uses it to decide whether to show
-   * the "demo mode" banner, so a stubbed screen is never mistaken for a real
-   * one.
-   */
-  environment: 'local' | 'staging' | 'production';
+    /**
+     * Which environment this is. The interface uses it to decide whether to show
+     * the "demo mode" banner, so a stubbed screen is never mistaken for a real
+     * one.
+     */
+    environment: 'local' | 'staging' | 'production';
 }
 
 /**
@@ -66,41 +66,41 @@ export const APP_CONFIG = new InjectionToken<AppConfig>('APP_CONFIG');
  *   message naming the file, is far easier to act on.
  */
 export async function loadAppConfig(): Promise<AppConfig> {
-  let response: Response;
-  try {
-    // A cache-busting query string. Without it, a browser that cached the old
-    // configuration would keep talking to the previous backend after a
-    // deployment — a genuinely baffling problem to debug.
-    response = await fetch(`config.json?v=${Date.now()}`, { cache: 'no-store' });
-  } catch (cause) {
-    throw new Error(
-      'Could not load config.json. The application cannot start without knowing ' +
-        'where the backend is. Check that public/config.json exists.',
-      { cause },
-    );
-  }
+    let response: Response;
+    try {
+        // A cache-busting query string. Without it, a browser that cached the old
+        // configuration would keep talking to the previous backend after a
+        // deployment — a genuinely baffling problem to debug.
+        response = await fetch(`config.json?v=${Date.now()}`, { cache: 'no-store' });
+    } catch (cause) {
+        throw new Error(
+            'Could not load config.json. The application cannot start without knowing ' +
+                'where the backend is. Check that public/config.json exists.',
+            { cause }
+        );
+    }
 
-  if (!response.ok) {
-    throw new Error(
-      `Could not load config.json (HTTP ${response.status}). This file must be ` +
-        'deployed alongside the application.',
-    );
-  }
+    if (!response.ok) {
+        throw new Error(
+            `Could not load config.json (HTTP ${response.status}). This file must be ` +
+                'deployed alongside the application.'
+        );
+    }
 
-  const config = (await response.json()) as Partial<AppConfig>;
+    const config = (await response.json()) as Partial<AppConfig>;
 
-  if (!config.apiBaseUrl) {
-    throw new Error(
-      'config.json does not contain "apiBaseUrl". Set it to the address of the ' +
-        'backend, for example "http://localhost:8000".',
-    );
-  }
+    if (!config.apiBaseUrl) {
+        throw new Error(
+            'config.json does not contain "apiBaseUrl". Set it to the address of the ' +
+                'backend, for example "http://localhost:8000".'
+        );
+    }
 
-  return {
-    // A trailing slash here would produce URLs with a doubled slash, which some
-    // servers treat as a different path. Removing it once, here, avoids a
-    // whole category of confusing 404s.
-    apiBaseUrl: config.apiBaseUrl.replace(/\/+$/, ''),
-    environment: config.environment ?? 'local',
-  };
+    return {
+        // A trailing slash here would produce URLs with a doubled slash, which some
+        // servers treat as a different path. Removing it once, here, avoids a
+        // whole category of confusing 404s.
+        apiBaseUrl: config.apiBaseUrl.replace(/\/+$/, ''),
+        environment: config.environment ?? 'local'
+    };
 }

@@ -17,59 +17,62 @@ import { loadAppConfig } from './app-config';
  * @param response What the stubbed fetch should return.
  */
 function stubFetch(response: Partial<Response> & { json?: () => Promise<unknown> }): void {
-  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response));
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response));
 }
 
 describe('loadAppConfig', () => {
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
-
-  it('reads the backend address', async () => {
-    stubFetch({
-      ok: true,
-      json: async () => ({ apiBaseUrl: 'https://api.example.com', environment: 'production' }),
+    afterEach(() => {
+        vi.unstubAllGlobals();
     });
 
-    const config = await loadAppConfig();
+    it('reads the backend address', async () => {
+        stubFetch({
+            ok: true,
+            json: async () => ({
+                apiBaseUrl: 'https://api.example.com',
+                environment: 'production'
+            })
+        });
 
-    expect(config.apiBaseUrl).toBe('https://api.example.com');
-    expect(config.environment).toBe('production');
-  });
+        const config = await loadAppConfig();
 
-  it('strips a trailing slash from the address', async () => {
-    // Without this, every URL would contain a doubled slash, which some
-    // servers treat as a different path and answer with a puzzling 404.
-    stubFetch({ ok: true, json: async () => ({ apiBaseUrl: 'https://api.example.com/' }) });
+        expect(config.apiBaseUrl).toBe('https://api.example.com');
+        expect(config.environment).toBe('production');
+    });
 
-    const config = await loadAppConfig();
+    it('strips a trailing slash from the address', async () => {
+        // Without this, every URL would contain a doubled slash, which some
+        // servers treat as a different path and answer with a puzzling 404.
+        stubFetch({ ok: true, json: async () => ({ apiBaseUrl: 'https://api.example.com/' }) });
 
-    expect(config.apiBaseUrl).toBe('https://api.example.com');
-  });
+        const config = await loadAppConfig();
 
-  it('defaults the environment to local when it is not stated', async () => {
-    stubFetch({ ok: true, json: async () => ({ apiBaseUrl: 'https://api.example.com' }) });
+        expect(config.apiBaseUrl).toBe('https://api.example.com');
+    });
 
-    const config = await loadAppConfig();
+    it('defaults the environment to local when it is not stated', async () => {
+        stubFetch({ ok: true, json: async () => ({ apiBaseUrl: 'https://api.example.com' }) });
 
-    expect(config.environment).toBe('local');
-  });
+        const config = await loadAppConfig();
 
-  it('refuses to start when the file is missing', async () => {
-    stubFetch({ ok: false, status: 404 });
+        expect(config.environment).toBe('local');
+    });
 
-    await expect(loadAppConfig()).rejects.toThrow(/config\.json/);
-  });
+    it('refuses to start when the file is missing', async () => {
+        stubFetch({ ok: false, status: 404 });
 
-  it('refuses to start when the backend address is absent', async () => {
-    stubFetch({ ok: true, json: async () => ({ environment: 'local' }) });
+        await expect(loadAppConfig()).rejects.toThrow(/config\.json/);
+    });
 
-    await expect(loadAppConfig()).rejects.toThrow(/apiBaseUrl/);
-  });
+    it('refuses to start when the backend address is absent', async () => {
+        stubFetch({ ok: true, json: async () => ({ environment: 'local' }) });
 
-  it('refuses to start when the file cannot be fetched at all', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network down')));
+        await expect(loadAppConfig()).rejects.toThrow(/apiBaseUrl/);
+    });
 
-    await expect(loadAppConfig()).rejects.toThrow(/cannot start/);
-  });
+    it('refuses to start when the file cannot be fetched at all', async () => {
+        vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network down')));
+
+        await expect(loadAppConfig()).rejects.toThrow(/cannot start/);
+    });
 });

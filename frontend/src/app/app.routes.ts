@@ -22,88 +22,82 @@
 import { Routes } from '@angular/router';
 
 export const routes: Routes = [
-  {
-    path: '',
-    pathMatch: 'full',
-    redirectTo: 'play',
-  },
-  {
-    path: 'play',
-    title: 'Play — AI Dungeon Master',
-    loadComponent: () => import('./features/chat/chat-page').then((m) => m.ChatPage),
-  },
-  {
-    path: 'play/:sessionId',
-    title: 'Play — AI Dungeon Master',
-    loadComponent: () => import('./features/chat/chat-page').then((m) => m.ChatPage),
-  },
-  {
-    path: 'campaigns',
-    title: 'Campaigns — AI Dungeon Master',
-    loadComponent: () =>
-      import('./features/campaigns/campaign-list-page').then((m) => m.CampaignListPage),
-  },
-  {
-    path: 'campaigns/new',
-    title: 'New campaign — AI Dungeon Master',
-    loadComponent: () =>
-      import('./features/campaigns/campaign-create-page').then((m) => m.CampaignCreatePage),
-  },
-  {
-    path: 'campaigns/:campaignId/characters',
-    title: 'Characters — AI Dungeon Master',
-    loadComponent: () =>
-      import('./features/characters/character-list-page').then((m) => m.CharacterListPage),
-  },
-  {
-    path: 'campaigns/:campaignId/characters/new',
-    title: 'New character — AI Dungeon Master',
-    loadComponent: () =>
-      import('./features/characters/character-create-page').then((m) => m.CharacterCreatePage),
-  },
-  {
-    path: 'characters/:characterId',
-    title: 'Character sheet — AI Dungeon Master',
-    loadComponent: () =>
-      import('./features/characters/character-sheet-page').then((m) => m.CharacterSheetPage),
-  },
-  {
-    path: 'settings',
-    title: 'Settings — AI Dungeon Master',
-    loadComponent: () => import('./features/settings/settings-page').then((m) => m.SettingsPage),
-  },
-  {
-    path: 'account',
-    title: 'Account — AI Dungeon Master',
-    loadComponent: () => import('./features/account/account-page').then((m) => m.AccountPage),
-  },
-  {
-    path: 'privacy',
-    title: 'Your data — AI Dungeon Master',
-    loadComponent: () => import('./features/account/privacy-page').then((m) => m.PrivacyPage),
-  },
+    {
+        path: '',
+        pathMatch: 'full',
+        redirectTo: 'play'
+    },
+    {
+        path: 'play',
+        title: 'Play — AI Dungeon Master',
+        loadComponent: () => import('./features/chat/chat-page').then((m) => m.ChatPage)
+    },
+    {
+        path: 'play/:sessionId',
+        title: 'Play — AI Dungeon Master',
+        loadComponent: () => import('./features/chat/chat-page').then((m) => m.ChatPage)
+    },
+    {
+        path: 'campaigns',
+        title: 'Campaigns — AI Dungeon Master',
+        loadComponent: () => import('./features/campaigns/campaign-list-page').then((m) => m.CampaignListPage)
+    },
+    {
+        path: 'campaigns/new',
+        title: 'New campaign — AI Dungeon Master',
+        loadComponent: () => import('./features/campaigns/campaign-create-page').then((m) => m.CampaignCreatePage)
+    },
+    {
+        path: 'campaigns/:campaignId/characters',
+        title: 'Characters — AI Dungeon Master',
+        loadComponent: () => import('./features/characters/character-list-page').then((m) => m.CharacterListPage)
+    },
+    {
+        path: 'campaigns/:campaignId/characters/new',
+        title: 'New character — AI Dungeon Master',
+        loadComponent: () => import('./features/characters/character-create-page').then((m) => m.CharacterCreatePage)
+    },
+    {
+        path: 'characters/:characterId',
+        title: 'Character sheet — AI Dungeon Master',
+        loadComponent: () => import('./features/characters/character-sheet-page').then((m) => m.CharacterSheetPage)
+    },
+    {
+        path: 'settings',
+        title: 'Settings — AI Dungeon Master',
+        loadComponent: () => import('./features/settings/settings-page').then((m) => m.SettingsPage)
+    },
+    {
+        path: 'account',
+        title: 'Account — AI Dungeon Master',
+        loadComponent: () => import('./features/account/account-page').then((m) => m.AccountPage)
+    },
+    {
+        path: 'privacy',
+        title: 'Your data — AI Dungeon Master',
+        loadComponent: () => import('./features/account/privacy-page').then((m) => m.PrivacyPage)
+    },
 
-  // --- Authentication. Fully designed, deliberately not fully implemented. ---
-  {
-    path: 'sign-in',
-    title: 'Sign in — AI Dungeon Master',
-    loadComponent: () => import('./features/auth/sign-in-page').then((m) => m.SignInPage),
-  },
-  {
-    path: 'sign-up',
-    title: 'Create an account — AI Dungeon Master',
-    loadComponent: () => import('./features/auth/sign-up-page').then((m) => m.SignUpPage),
-  },
-  {
-    path: 'forgot-password',
-    title: 'Reset your password — AI Dungeon Master',
-    loadComponent: () =>
-      import('./features/auth/forgot-password-page').then((m) => m.ForgotPasswordPage),
-  },
+    // --- Authentication. Fully designed, deliberately not fully implemented. ---
+    {
+        path: 'sign-in',
+        title: 'Sign in — AI Dungeon Master',
+        loadComponent: () => import('./features/auth/sign-in-page').then((m) => m.SignInPage)
+    },
+    {
+        path: 'sign-up',
+        title: 'Create an account — AI Dungeon Master',
+        loadComponent: () => import('./features/auth/sign-up-page').then((m) => m.SignUpPage)
+    },
+    {
+        path: 'forgot-password',
+        title: 'Reset your password — AI Dungeon Master',
+        loadComponent: () => import('./features/auth/forgot-password-page').then((m) => m.ForgotPasswordPage)
+    },
 
-  {
-    path: '**',
-    title: 'Not found — AI Dungeon Master',
-    loadComponent: () => import('./features/shell/not-found-page').then((m) => m.NotFoundPage),
-  },
+    {
+        path: '**',
+        title: 'Not found — AI Dungeon Master',
+        loadComponent: () => import('./features/shell/not-found-page').then((m) => m.NotFoundPage)
+    }
 ];

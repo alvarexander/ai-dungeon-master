@@ -17,30 +17,28 @@ import { ChangeDetectionStrategy, Component, input } from '@angular/core';
 import { Banner } from './banner';
 
 @Component({
-  selector: 'app-stub-notice',
-  changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Banner],
-  template: `
-    <app-banner kind="warning" title="This screen is a preview">
-      <p style="margin: 0">{{ detail() }}</p>
-      @if (whatIsReal()) {
-        <p style="margin: 8px 0 0" class="small">
-          <strong>What genuinely works:</strong> {{ whatIsReal() }}
-        </p>
-      }
-    </app-banner>
-  `,
+    selector: 'app-stub-notice',
+    changeDetection: ChangeDetectionStrategy.OnPush,
+    imports: [Banner],
+    template: `
+        <app-banner kind="warning" title="This screen is a preview">
+            <p style="margin: 0">{{ detail() }}</p>
+            @if (whatIsReal()) {
+                <p style="margin: 8px 0 0" class="small"><strong>What genuinely works:</strong> {{ whatIsReal() }}</p>
+            }
+        </app-banner>
+    `
 })
 export class StubNotice {
-  /** What is not implemented, stated plainly. */
-  readonly detail = input.required<string>();
+    /** What is not implemented, stated plainly. */
+    readonly detail = input.required<string>();
 
-  /**
-   * What on this screen is genuinely working.
-   *
-   * Included because "this is a preview" on its own is misleading in the other
-   * direction — on most of these screens a good deal is real, and it is worth
-   * saying which parts.
-   */
-  readonly whatIsReal = input<string>('');
+    /**
+     * What on this screen is genuinely working.
+     *
+     * Included because "this is a preview" on its own is misleading in the other
+     * direction — on most of these screens a good deal is real, and it is worth
+     * saying which parts.
+     */
+    readonly whatIsReal = input<string>('');
 }

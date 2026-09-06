@@ -39,6 +39,14 @@ class UserSettings(ApiModel):
         description="Send automatically when speech stops, rather than waiting for a press.",
         examples=[False],
     )
+    voice_output_enabled: bool = Field(
+        default=True,
+        description=(
+            "Whether the Dungeon Master reads its narration aloud. Uses the voice built "
+            "into the browser, so nothing is sent anywhere to produce the audio."
+        ),
+        examples=[True],
+    )
     theme: Literal["dark", "light", "system"] = Field(default="dark", examples=["dark"])
     reduce_motion: bool = Field(
         default=False, description="Honour reduced-motion preferences for animations.", examples=[False]
@@ -61,6 +69,7 @@ class SettingsUpdateRequest(ApiModel):
     content_filter: Literal["family", "standard", "mature"] | None = None
     voice_input_enabled: bool | None = None
     voice_autosend: bool | None = None
+    voice_output_enabled: bool | None = None
     theme: Literal["dark", "light", "system"] | None = None
     reduce_motion: bool | None = None
     analytics_opt_in: bool | None = None

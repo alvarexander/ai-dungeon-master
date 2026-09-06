@@ -1,165 +1,274 @@
-<div class="play">
-  <!--
-    The conversation.
+<!--
+  The play screen.
 
-    `aria-live="polite"` means a screen reader announces new messages as they
-    arrive, without interrupting whatever it is currently saying. Without it, a
-    blind player would have no idea the Dungeon Master had replied.
-  -->
-  <div class="transcript" role="log" aria-live="polite" aria-label="Conversation with the Dungeon Master">
-    @if (isEmpty() && !waiting()) {
-      <div class="opening">
-        <h1>The lantern is lit.</h1>
-        <p class="page__lead">
-          Describe what your character does and the Dungeon Master will narrate what happens.
-          Speak or type — it makes no difference to the story.
-        </p>
+  Two accessibility details that are invisible when they work:
 
-        <div class="suggestions">
-          <p class="small muted">Not sure how to start? Try one of these:</p>
-          @for (suggestion of [
-            'I push open the chapel door and hold up the lantern.',
-            'I ask the innkeeper what everyone in the village is refusing to talk about.',
-            'I want to make a character first — help me build one.'
-          ]; track suggestion) {
-            <button type="button" class="suggestion" (click)="useSuggestion(suggestion)">
-              {{ suggestion }}
-            </button>
-          }
-        </div>
-      </div>
-    }
+  1. `role="log"` with `aria-live="polite"` means a screen reader announces new
+     narration as it arrives, without interrupting whatever it is currently
+     saying. Without it a blind player would not know the Dungeon Master had
+     replied at all.
 
-    @for (line of lines(); track line.id) {
-      <article
-        class="line line--{{ line.role }}"
-        [class.line--pending]="line.pending"
-      >
-        <p class="line__who">
-          {{ line.role === 'player' ? 'You' : 'Dungeon Master' }}
-          @if (line.inputMode === 'voice') {
-            <span class="line__mode" title="Spoken">&#127908;</span>
-          }
-        </p>
-        <div class="line__body">{{ line.content }}</div>
-      </article>
-    }
+  2. The status line below the composer is `aria-live="polite"` too, so
+     "Listening", "Thinking" and "Reading aloud" are spoken as they change.
+     Sighted players get that from the waveform and the spinner; everyone else
+     needs it said.
+-->
 
-    @if (waiting()) {
-      <article class="line line--dungeon_master">
-        <p class="line__who">Dungeon Master</p>
-        <div class="thinking" aria-label="The Dungeon Master is thinking">
-          <span></span><span></span><span></span>
-        </div>
-      </article>
-    }
+<div class="play" [class.play--conversational]="conversational()">
+    <app-dice-roller (rolled)="sendRoll($event)" />
+    <div class="transcript" role="log" aria-live="polite" aria-label="Conversation with the Dungeon Master">
+        @if (isEmpty() && !waiting()) {
+            <div class="opening">
+                <h1>The lantern is lit.</h1>
+                <p class="page__lead">
+                    Describe what your character does and the Dungeon Master will narrate what happens. Speak or type —
+                    it makes no difference to the story.
+                </p>
 
-    <div #transcriptEnd></div>
-  </div>
+                <div class="suggestions">
+                    <p class="small muted">Not sure how to start? Try one of these:</p>
+                    @for (
+                        suggestion of [
+                            'I push open the chapel door and hold up the lantern.',
+                            'I ask the innkeeper what everyone in the village is refusing to talk about.',
+                            'I want to make a character first — help me build one.'
+                        ];
+                        track suggestion
+                    ) {
+                        <button type="button" class="suggestion" (click)="useSuggestion(suggestion)">
+                            {{ suggestion }}
+                        </button>
+                    }
+                </div>
 
-  <!-- Failures -->
-  @if (error(); as message) {
-    <div class="play__notice">
-      <app-banner kind="danger" title="That did not work">
-        <p style="margin: 0 0 8px">{{ message }}</p>
-        @if (correlationId(); as id) {
-          <p class="small" style="margin: 0">
-            If you report this, quote: <code class="mono">{{ id }}</code>
-            <br />
-            <span class="muted">
-              That identifier is all we need to find out what happened — nobody has to read
-              your campaign to investigate it.
-            </span>
-          </p>
+                @if (conversationalAvailable()) {
+                    <button type="button" class="handsfree-invite" (click)="toggleConversational()">
+                        <app-icon name="forum" [size]="18" />
+                        <span>
+                            <strong>Or just talk to it.</strong>
+                            <span class="small muted">
+                                Hands-free: it listens, replies out loud, and waits for you again.
+                            </span>
+                        </span>
+                    </button>
+                }
+            </div>
         }
-        <button type="button" class="btn btn--ghost btn--sm" style="margin-top: 8px" (click)="dismissError()">
-          Dismiss
-        </button>
-      </app-banner>
+
+        @for (line of lines(); track line.id) {
+            <article class="msg msg--{{ line.role }}" [class.msg--pending]="line.pending">
+                @if (line.role === 'dungeon_master') {
+                    <div class="msg__avatar" aria-hidden="true">&#9670;</div>
+                }
+
+                <div class="msg__content">
+                    <p class="msg__who">
+                        {{ line.role === 'player' ? 'You' : 'Dungeon Master' }}
+                        @if (line.inputMode === 'voice') {
+                            <app-icon name="mic" [size]="12" label="Spoken" />
+                        }
+                    </p>
+
+                    <div class="msg__body">{{ line.content }}</div>
+
+                    @if (line.role === 'dungeon_master' && speechAvailable() && !line.pending) {
+                        <div class="msg__actions">
+                            @if (speakingId() === line.id) {
+                                <button type="button" class="chip" (click)="stopSpeaking()">
+                                    <app-icon name="stop" [size]="14" />
+                                    Stop reading
+                                </button>
+                            } @else {
+                                <button
+                                    type="button"
+                                    class="chip"
+                                    (click)="readAloud(line.id, line.content)"
+                                    [disabled]="speech.speaking()"
+                                >
+                                    <app-icon name="volume_up" [size]="14" />
+                                    Read aloud
+                                </button>
+                            }
+                        </div>
+                    }
+                </div>
+            </article>
+        }
+
+        @if (waiting()) {
+            <article class="msg msg--dungeon_master">
+                <div class="msg__avatar" aria-hidden="true">&#9670;</div>
+                <div class="msg__content">
+                    <p class="msg__who">Dungeon Master</p>
+                    <div class="thinking" aria-label="The Dungeon Master is thinking">
+                        <span></span><span></span><span></span>
+                    </div>
+                </div>
+            </article>
+        }
+
+        <div #transcriptEnd></div>
     </div>
-  }
 
-  @if (voice.error(); as voiceError) {
-    <div class="play__notice">
-      <app-banner kind="warning" title="Voice input">
-        <p style="margin: 0">{{ voiceError }}</p>
-      </app-banner>
-    </div>
-  }
+    <!-- Failures -->
+    @if (error(); as message) {
+        <div class="play__notice">
+            <app-banner kind="danger" title="That did not work">
+                <p style="margin: 0 0 8px">{{ message }}</p>
+                @if (correlationId(); as id) {
+                    <p class="small" style="margin: 0">
+                        If you report this, quote: <code class="mono">{{ id }}</code>
+                        <br />
+                        <span class="muted"> That identifier is all we need to find out what happened. </span>
+                    </p>
+                }
+                <button type="button" class="btn btn--ghost btn--sm" style="margin-top: 8px" (click)="dismissError()">
+                    Dismiss
+                </button>
+            </app-banner>
+        </div>
+    }
 
-  <!-- The composer -->
-  <div class="composer">
-    @if (voice.isRecording()) {
-      <div class="recording" role="status">
-        <span class="recording__dot" aria-hidden="true"></span>
-        <span>Listening… {{ recordingTime() }}</span>
-        <span class="spacer"></span>
-        <button type="button" class="btn btn--ghost btn--sm" (click)="cancelRecording()">Cancel</button>
-        <button type="button" class="btn btn--primary btn--sm" (click)="toggleRecording()">Done</button>
-      </div>
-    } @else {
-      <div class="composer__row">
-        <label class="visually-hidden" for="message">What do you do?</label>
-        <textarea
-          id="message"
-          class="textarea composer__input"
-          rows="2"
-          placeholder="What do you do?"
-          [ngModel]="draft()"
-          (ngModelChange)="draft.set($event)"
-          (keydown)="onKeydown($event)"
-          [disabled]="waiting() || voice.isTranscribing()"
-        ></textarea>
+    @if (voice.error(); as voiceError) {
+        <div class="play__notice">
+            <app-banner kind="warning" title="Voice input">
+                <p style="margin: 0">{{ voiceError }}</p>
+            </app-banner>
+        </div>
+    }
 
-        @if (voiceAvailable()) {
-          <button
-            type="button"
-            class="btn composer__mic"
-            (click)="toggleRecording()"
-            [disabled]="waiting() || voice.isTranscribing()"
-            [attr.aria-label]="voice.isTranscribing() ? 'Transcribing your recording' : 'Record a message'"
-          >
-            @if (voice.isTranscribing()) {
-              <span aria-hidden="true">…</span>
-            } @else {
-              <span aria-hidden="true">&#127908;</span>
+    <!-- The composer -->
+    <div class="composer">
+        @if (voice.isRecording() || voice.isRequesting()) {
+            <div class="listening">
+                <span class="listening__dot" aria-hidden="true"></span>
+                <app-waveform [levels]="voice.levels()" [active]="voice.isRecording()" />
+                <span class="listening__time mono">{{ recordingTime() }}</span>
+                <button type="button" class="icon-btn" (click)="cancelRecording()" title="Cancel">
+                    <app-icon name="close" [size]="18" label="Cancel recording" />
+                </button>
+                @if (!conversational()) {
+                    <button type="button" class="btn btn--primary btn--sm" (click)="toggleRecording()">
+                        <app-icon name="stop" [size]="16" />
+                        Done
+                    </button>
+                }
+            </div>
+        } @else {
+            <div class="composer__row">
+                <label class="visually-hidden" for="message">What do you do?</label>
+                <textarea
+                    id="message"
+                    class="textarea composer__input"
+                    rows="2"
+                    placeholder="What do you do?"
+                    [ngModel]="draft()"
+                    (ngModelChange)="draft.set($event)"
+                    (keydown)="onKeydown($event)"
+                    [disabled]="waiting() || voice.isTranscribing()"
+                ></textarea>
+
+                @if (voiceAvailable()) {
+                    <button
+                        type="button"
+                        class="icon-btn icon-btn--mic"
+                        (click)="toggleRecording()"
+                        [disabled]="waiting() || voice.isTranscribing()"
+                        [title]="voice.isTranscribing() ? 'Transcribing…' : 'Record a message'"
+                    >
+                        @if (voice.isTranscribing()) {
+                            <app-icon name="graphic_eq" [size]="20" label="Transcribing your recording" />
+                        } @else {
+                            <app-icon name="mic" [size]="20" label="Record a message" />
+                        }
+                    </button>
+                }
+
+                @if (phase() === 'thinking' || phase() === 'speaking') {
+                    <button
+                        type="button"
+                        class="btn btn--stop composer__send"
+                        (click)="stopEverything()"
+                        [title]="phase() === 'thinking' ? 'Stop waiting for the reply' : 'Stop reading aloud'"
+                    >
+                        <app-icon name="stop" [size]="16" />
+                        <span class="composer__send-label">Stop</span>
+                    </button>
+                } @else {
+                    <button
+                        type="button"
+                        class="btn btn--primary composer__send"
+                        (click)="send('typed')"
+                        [disabled]="!canSend()"
+                    >
+                        <app-icon name="send" [size]="16" />
+                        <span class="composer__send-label">Send</span>
+                    </button>
+                }
+            </div>
+        }
+
+        <!-- Status line. Announced to screen readers as it changes. -->
+        <div class="statusline small" aria-live="polite">
+            @switch (phase()) {
+                @case ('listening') {
+                    <span class="statusline__live">Listening…</span>
+                }
+                @case ('transcribing') {
+                    <span>Turning your words into text, on our own server.</span>
+                }
+                @case ('thinking') {
+                    <span>The Dungeon Master is thinking…</span>
+                    <button type="button" class="chip chip--stop" (click)="stopEverything()">
+                        <app-icon name="stop" [size]="13" />
+                        Stop
+                    </button>
+                }
+                @case ('speaking') {
+                    <span class="statusline__live">Reading aloud…</span>
+                    <button type="button" class="chip chip--stop" (click)="stopEverything()">
+                        <app-icon name="stop" [size]="13" />
+                        Stop
+                    </button>
+                }
+                @default {
+                    <span class="muted">Press Enter to send, Shift+Enter for a new line.</span>
+                }
             }
-          </button>
-        }
 
-        <button
-          type="button"
-          class="btn btn--primary composer__send"
-          (click)="send('typed')"
-          [disabled]="!canSend()"
-        >
-          Send
-        </button>
-      </div>
+            <span class="spacer"></span>
 
-      <p class="composer__hint small muted">
-        Press Enter to send, Shift+Enter for a new line.
-        @if (voiceAvailable()) {
-          Speech is transcribed on our own server, never sent to Google.
-        }
-      </p>
-    }
-  </div>
-
-  <!-- What the last turn cost, and what left the building -->
-  @if (usage(); as tokenUsage) {
-    <div class="meta small muted">
-      <span>{{ tokenUsage.model_id }}</span>
-      <span>·</span>
-      <span>{{ tokenUsage.tokens_in }} in / {{ tokenUsage.tokens_out }} out</span>
-      <span>·</span>
-      <span>{{ tokenUsage.latency_ms }}ms</span>
-      @if (scrubbed()) {
-        <span>·</span>
-        <span class="scrub-note" title="Personal details were replaced before this was sent to Google">
-          &#128274; personal details removed before sending
-        </span>
-      }
+            @if (conversationalAvailable()) {
+                <button
+                    type="button"
+                    class="chip chip--toggle"
+                    [class.chip--on]="conversational()"
+                    (click)="toggleConversational()"
+                    [attr.aria-pressed]="conversational()"
+                >
+                    <app-icon name="forum" [size]="14" />
+                    {{ conversational() ? 'Hands-free on' : 'Hands-free' }}
+                </button>
+            }
+        </div>
     </div>
-  }
+
+    <!-- What the last turn cost -->
+    @if (usage(); as tokenUsage) {
+        <div class="meta small muted">
+            <span>{{ tokenUsage.model_id }}</span>
+            <span>·</span>
+            <span>{{ tokenUsage.tokens_in }} in / {{ tokenUsage.tokens_out }} out</span>
+            <span>·</span>
+            <span>{{ tokenUsage.latency_ms }}ms</span>
+            @if (scrubbed()) {
+                <span>·</span>
+                <span class="scrub-note" title="Personal details were replaced before this was sent to Google">
+                    personal details removed before sending
+                </span>
+            }
+            <span class="spacer"></span>
+            <a routerLink="/privacy">Your data</a>
+        </div>
+    }
 </div>

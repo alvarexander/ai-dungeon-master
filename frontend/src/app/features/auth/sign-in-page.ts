@@ -29,108 +29,108 @@ import { Banner } from '../../shared/ui/banner';
 import { StubNotice } from '../../shared/ui/stub-notice';
 
 @Component({
-  selector: 'app-sign-in-page',
-  changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, RouterLink, Banner, StubNotice],
-  styleUrl: './auth-layout.scss',
-  template: `
-    <div class="auth">
-      <header class="auth__header">
-        <h1>Sign in</h1>
-        <p class="muted">Pick up where your last campaign left off.</p>
-      </header>
+    selector: 'app-sign-in-page',
+    changeDetection: ChangeDetectionStrategy.OnPush,
+    imports: [FormsModule, RouterLink, Banner, StubNotice],
+    styleUrl: './auth-layout.scss',
+    template: `
+        <div class="auth">
+            <header class="auth__header">
+                <h1>Sign in</h1>
+                <p class="muted">Pick up where your last campaign left off.</p>
+            </header>
 
-      <div class="auth__notice">
-        <app-stub-notice
-          detail="Signing in does not yet create a real, protected session — the token
+            <div class="auth__notice">
+                <app-stub-notice
+                    detail="Signing in does not yet create a real, protected session — the token
                   handed out is a placeholder that is not verified."
-          whatIsReal="Your password is genuinely checked against an Argon2id hash, your
+                    whatIsReal="Your password is genuinely checked against an Argon2id hash, your
                       email address is looked up without ever being readable, and sign-in
                       attempts are rate limited."
-        />
-      </div>
+                />
+            </div>
 
-      @if (error(); as message) {
-        <div class="auth__notice">
-          <app-banner kind="danger">
-            <p style="margin: 0">{{ message }}</p>
-          </app-banner>
+            @if (error(); as message) {
+                <div class="auth__notice">
+                    <app-banner kind="danger">
+                        <p style="margin: 0">{{ message }}</p>
+                    </app-banner>
+                </div>
+            }
+
+            <form class="card auth__card" (ngSubmit)="submit()">
+                <label class="field">
+                    <span class="field__label">Email or username</span>
+                    <input
+                        class="input"
+                        name="identifier"
+                        autocomplete="username"
+                        required
+                        [ngModel]="identifier()"
+                        (ngModelChange)="identifier.set($event)"
+                    />
+                </label>
+
+                <label class="field">
+                    <span class="field__label">Password</span>
+                    <input
+                        class="input"
+                        type="password"
+                        name="password"
+                        autocomplete="current-password"
+                        required
+                        [ngModel]="password()"
+                        (ngModelChange)="password.set($event)"
+                    />
+                    <span class="field__hint">
+                        <a routerLink="/forgot-password">Forgotten your password?</a>
+                    </span>
+                </label>
+
+                <button type="submit" class="btn btn--primary btn--block" [disabled]="loading()">
+                    {{ loading() ? 'Signing in…' : 'Sign in' }}
+                </button>
+            </form>
+
+            <p class="auth__footer">
+                No account yet? <a routerLink="/sign-up">Create one</a>
+                <br />
+                <a routerLink="/play">Or carry on in demo mode</a>
+            </p>
         </div>
-      }
-
-      <form class="card auth__card" (ngSubmit)="submit()">
-        <label class="field">
-          <span class="field__label">Email or username</span>
-          <input
-            class="input"
-            name="identifier"
-            autocomplete="username"
-            required
-            [ngModel]="identifier()"
-            (ngModelChange)="identifier.set($event)"
-          />
-        </label>
-
-        <label class="field">
-          <span class="field__label">Password</span>
-          <input
-            class="input"
-            type="password"
-            name="password"
-            autocomplete="current-password"
-            required
-            [ngModel]="password()"
-            (ngModelChange)="password.set($event)"
-          />
-          <span class="field__hint">
-            <a routerLink="/forgot-password">Forgotten your password?</a>
-          </span>
-        </label>
-
-        <button type="submit" class="btn btn--primary btn--block" [disabled]="loading()">
-          {{ loading() ? 'Signing in…' : 'Sign in' }}
-        </button>
-      </form>
-
-      <p class="auth__footer">
-        No account yet? <a routerLink="/sign-up">Create one</a>
-        <br />
-        <a routerLink="/play">Or carry on in demo mode</a>
-      </p>
-    </div>
-  `,
+    `
 })
 export class SignInPage {
-  private readonly session = inject(SessionStore);
-  private readonly router = inject(Router);
+    private readonly session = inject(SessionStore);
+    private readonly router = inject(Router);
 
-  /** The email address or username being entered. */
-  readonly identifier = signal('');
+    /** The email address or username being entered. */
+    readonly identifier = signal('');
 
-  /** The password being entered. Never logged and never stored. */
-  readonly password = signal('');
+    /** The password being entered. Never logged and never stored. */
+    readonly password = signal('');
 
-  /** True while the request is in flight. */
-  readonly loading = this.session.loading;
+    /** True while the request is in flight. */
+    readonly loading = this.session.loading;
 
-  /** The current failure message, or `null`. */
-  readonly error = this.session.error;
+    /** The current failure message, or `null`. */
+    readonly error = this.session.error;
 
-  /**
-   * Submit the form.
-   *
-   * @returns Nothing. On success the player is taken to the play screen.
-   */
-  async submit(): Promise<void> {
-    const success = await this.session.login({
-      identifier: this.identifier(),
-      password: this.password(),
-    });
-    if (success) {
-      // Cleared immediately on success so the password does not sit in memory
-      // any longer than it has to.
-      this.password.set('');
-      await this.router.navigate(['/play']);
+    /**
+     * Submit the form.
+     *
+     * @returns Nothing. On success the player is taken to the play screen.
+     */
+    async submit(): Promise<void> {
+        const success = await this.session.login({
+            identifier: this.identifier(),
+            password: this.password()
+        });
+        if (success) {
+            // Cleared immediately on success so the password does not sit in memory
+            // any longer than it has to.
+            this.password.set('');
+            await this.router.navigate(['/play']);
+        }
     }
-  }
 }

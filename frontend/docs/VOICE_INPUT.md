@@ -33,7 +33,7 @@ objection: it is a third party receiving raw audio.
 
 ### The honest tension
 
-We *do* send the transcribed text to Gemini, because that is the product. So
+We _do_ send the transcribed text to Gemini, because that is the product. So
 why fight over the audio?
 
 Because the two are not equivalent:
@@ -92,13 +92,13 @@ difference to accuracy in an ordinary room.
 
 ### Limits
 
-| Limit | Value | Why |
-|---|---|---|
-| Maximum recording | 120 seconds | A self-stop, so someone who walks away does not leave the microphone live and then upload an enormous file |
-| Maximum upload | 10 MB | Bounds server memory |
-| Rate limit | 10 per minute | Transcription is the most processor-intensive thing the server does |
+| Limit             | Value         | Why                                                                                                        |
+| ----------------- | ------------- | ---------------------------------------------------------------------------------------------------------- |
+| Maximum recording | 120 seconds   | A self-stop, so someone who walks away does not leave the microphone live and then upload an enormous file |
+| Maximum upload    | 10 MB         | Bounds server memory                                                                                       |
+| Rate limit        | 10 per minute | Transcription is the most processor-intensive thing the server does                                        |
 
-The 120-second stop is enforced in the browser *and* the duration is checked
+The 120-second stop is enforced in the browser _and_ the duration is checked
 again on the server, because a browser limit is a convenience, not a control.
 
 ---
@@ -128,12 +128,12 @@ Without that explanation the button appears simply broken.
 
 ### Every failure, and what the user is told
 
-| Browser error | What we say |
-|---|---|
-| `NotAllowedError` | Blocked — change it in the browser's settings, with instructions |
-| `NotFoundError` | No microphone found. Check one is connected |
-| `NotReadableError` | Another application is using it. Close that and retry |
-| anything else | Could not start recording. You can still type |
+| Browser error      | What we say                                                      |
+| ------------------ | ---------------------------------------------------------------- |
+| `NotAllowedError`  | Blocked — change it in the browser's settings, with instructions |
+| `NotFoundError`    | No microphone found. Check one is connected                      |
+| `NotReadableError` | Another application is using it. Close that and retry            |
+| anything else      | Could not start recording. You can still type                    |
 
 Every message ends with a way forward. **Typing always works**, and every voice
 failure says so.
@@ -191,6 +191,7 @@ are several hundred megabytes. If they are absent the endpoint returns a clear
 ## Related documents
 
 - [ARCHITECTURE.md](ARCHITECTURE.md) — where the recorder sits.
+- [DICE.md](DICE.md) — the other half of the play screen.
 - [Backend transcription service](../../backend/app/services/transcription.py) —
   the other half.
 - [ADR-008](../../docs/DECISIONS_PRIVACY.md) — the decision and its cost.
