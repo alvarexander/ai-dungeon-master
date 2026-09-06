@@ -3,7 +3,7 @@
 **Read this when** a word in the backend documentation means nothing to you.
 
 Terms shared with the frontend — API, CORS, encryption, hashing, HMAC,
-crypto-shredding, tokens, containers, and so on — are in the
+hashing, tokens, containers, and so on — are in the
 [shared glossary](../../docs/GLOSSARY.md). This file covers what is specific to
 the Python service.
 
@@ -54,8 +54,6 @@ network access.
 **httpx** — the HTTP client used for outbound calls, wrapped in our SSRF guard.
 
 **argon2-cffi** — the password hashing library.
-
-**boto3** — the AWS library, used for KMS. Only needed in Phase 2.
 
 ---
 
@@ -111,55 +109,15 @@ The repository layer is the encryption choke point.
 **Correlation identifier** — the random value identifying one request, stamped
 on all its log lines and returned to the browser. The primary debugging tool.
 
-**Redaction filter** — the log processor replacing any field not on the
-allowlist with a description of its type and length.
-
-**Allowlist (`LOGGABLE_FIELDS`)** — the explicit list of fields that may be
-logged. Anything else is censored by default.
+**Redaction filter** — the log processor that replaces the value of any field
+whose name looks like a credential. Matching is on whole words, so `tokens_in`
+is not mistaken for a `token`.
 
 **Scrubber** — the code that strips structured personal data from prompts
 before they are sent to Google.
 
-**Blind index key** — the secret used to fingerprint email addresses. Held in
-AWS Secrets Manager and **never** in the database; its absence there is the
-whole defence.
-
-**Daily salt** — the value used to fingerprint IP addresses, derived fresh each
-day and never stored, so counters cannot be assembled into a history.
-
-**Wrapped key** — a per-user key encrypted by KMS, safe to store beside the
-data it opens.
-
-**AAD (Additional Authenticated Data)** — extra context mixed into the tamper
-check but not stored. Binds each ciphertext to its user, table and column, so
-values cannot be moved between rows.
-
 **Stub** — behaviour deliberately not implemented. In Phase 1 the session token
 is a stub; the password hashing behind it is real.
-
-**Debug capture** — the player's opt-in switch storing prompt content,
-encrypted under their own key, for at most 48 hours.
-
-**Support grant** — a time-boxed, audited permission to decrypt one user's
-records, which also writes an entry into that user's own visible activity log.
-
-**Break-glass** — the emergency procedure for access that is normally denied.
-Every use is alerted on.
-
----
-
-## Database column suffixes
-
-Three suffixes carry meaning throughout the schema and the code:
-
-| Suffix | Means | Example |
-|---|---|---|
-| `_ct` | Ciphertext — bytes, unreadable without a key | `email_ct` |
-| `_bidx` | Blind index — a searchable keyed fingerprint | `email_bidx` |
-| `_hmac` | A digest used for counting, not lookup | `ip_hmac` |
-
-Seeing `_ct` should immediately tell a reader "these are bytes; do not try to
-print them".
 
 ---
 

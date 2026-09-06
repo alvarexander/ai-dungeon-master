@@ -56,9 +56,6 @@ export class ChatPage {
   /** What the player is currently typing. */
   readonly draft = signal('');
 
-  /** Whether the opt-in debug capture is on for this session. */
-  readonly debugCapture = signal(false);
-
   /** True when the send button should be usable. */
   readonly canSend = computed(() => this.draft().trim().length > 0 && !this.waiting());
 
@@ -155,17 +152,6 @@ export class ChatPage {
    */
   cancelRecording(): void {
     this.voice.cancel();
-  }
-
-  /**
-   * Turn the opt-in prompt capture on or off.
-   *
-   * @param enabled Whether to store prompt content, encrypted, for 48 hours.
-   * @returns Nothing.
-   */
-  async toggleDebugCapture(enabled: boolean): Promise<void> {
-    this.debugCapture.set(enabled);
-    await this.chat.setDebugCapture(enabled);
   }
 
   /**

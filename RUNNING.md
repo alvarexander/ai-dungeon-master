@@ -158,11 +158,10 @@ cd ~/Git/ai-dungeon-master/backend && uv run uvicorn app.main:app --reload --por
 
 **What you should see**, in this order:
 
-1. A large warning box reading `DEVELOPMENT MODE — NOT SECURE`, listing three
-   things: development encryption key, stubbed authentication, in-memory
-   storage. **This is correct.** It is the application telling you honestly
-   that it is not protecting anything real yet. It refuses to start with these
-   settings if you ever mark it as production.
+1. A warning box reading `DEVELOPMENT MODE — NOT SECURE`, listing stubbed
+   authentication and in-memory storage. **This is correct.** It is the
+   application telling you honestly what is not real yet, and it refuses to
+   start with these settings if you ever mark it as production.
 2. A line like `demo_user_created`.
 3. `Uvicorn running on http://127.0.0.1:8000`.
 
@@ -364,10 +363,11 @@ the backend already running, in a third terminal.
 Press **Ctrl+C** in each terminal window. That is the standard way to stop a
 running program on the command line.
 
-**Everything you created is now gone.** Phase 1 keeps all data in the server's
-memory rather than in a database, so campaigns, characters and conversations
-disappear on restart. This is expected — the database is Phase 2. The seed
-script above gets you back to a populated state in one command.
+**Everything you created is now gone**, unless you set up MySQL. By default all
+data lives in the server's memory, so campaigns, characters and conversations
+disappear on restart. The seed script above repopulates it in one command, and
+[docs/LOCAL_MYSQL.md](docs/LOCAL_MYSQL.md) shows how to use a real database so
+it persists.
 
 ---
 
@@ -400,10 +400,9 @@ data to find out what happened to them.
 cd ~/Git/ai-dungeon-master/backend && uv run pytest
 ```
 
-**What you should see:** a row of dots and a final line like `88 passed in
-2.2s`. These tests cover the encryption, the log redaction filter, the SSRF
-guard, rate limiting, and the API's security behaviour. If they pass, the
-privacy machinery is genuinely working rather than merely described.
+**What you should see:** a row of dots and a final line like `90 passed in
+2.2s`. These cover password hashing, the log redaction filter, the SSRF guard,
+rate limiting, and the API's security behaviour.
 
 ```bash
 cd ~/Git/ai-dungeon-master/frontend && npm test

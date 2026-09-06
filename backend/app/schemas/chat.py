@@ -106,15 +106,3 @@ class TranscriptMessage(ApiModel):
     created_at: str = Field(examples=["2026-09-06T10:22:31Z"])
 
 
-class DebugCaptureRequest(ApiModel):
-    """Turn the opt-in prompt capture on or off for one session."""
-
-    enabled: bool = Field(
-        description=(
-            "When on, the exact prompt and reply are stored — encrypted under the "
-            "player's own key — for at most 48 hours, and are readable only through the "
-            "audited support flow. Presented in the interface as 'help us debug this "
-            "session', because that is exactly what it is."
-        ),
-        examples=[True],
-    )

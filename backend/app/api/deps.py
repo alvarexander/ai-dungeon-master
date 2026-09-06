@@ -18,9 +18,9 @@ Two reasons this matters beyond tidiness:
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from collections.abc import Awaitable, Callable
-from typing import Annotated
+from dataclasses import dataclass
+from typing import Annotated, Any
 
 from fastapi import Depends, Header, Request
 
@@ -28,15 +28,12 @@ from app.config import Settings, get_settings
 from app.core.errors import ApiError, RateLimitedError
 from app.core.logging import get_logger
 from app.core.ratelimit import InMemoryRateLimiter
-from app.core.security.blind_index import BlindIndexService
-from app.core.security.crypto import EncryptionService
-from app.repositories.base import User
-from app.repositories.memory import (
-    MemoryCampaignRepository,
-    MemoryCharacterRepository,
-    MemorySessionRepository,
-    MemoryStore,
-    MemoryUserRepository,
+from app.repositories.base import (
+    CampaignRepository,
+    CharacterRepository,
+    SessionRepository,
+    User,
+    UserRepository,
 )
 from app.services.analytics import AnalyticsService
 from app.services.auth import AuthService
@@ -57,14 +54,13 @@ class Container:
     """
 
     settings: Settings
-    store: MemoryStore
-    encryption: EncryptionService
-    blind_index: BlindIndexService
+    # Either MemoryStore or SqlStore — see main.build_container.
+    store: Any
     limiter: InMemoryRateLimiter
-    users: MemoryUserRepository
-    campaigns: MemoryCampaignRepository
-    characters: MemoryCharacterRepository
-    sessions: MemorySessionRepository
+    users: UserRepository
+    campaigns: CampaignRepository
+    characters: CharacterRepository
+    sessions: SessionRepository
     analytics: AnalyticsService
     gemini: GeminiClient
     transcription: TranscriptionService
@@ -148,11 +144,7 @@ def rate_limit(scope: str) -> Callable[..., Awaitable[None]]:
             RateLimitedError: If the caller is over the limit.
         """
         rule = container.settings.rate_limits[scope]
-        # The address is fingerprinted before it is used. This is the whole
-        # privacy claim about rate limiting: what gets counted is a digest that
-        # changes daily, never a readable address.
-        bucket = container.blind_index.ip_digest(client_ip(request))
-        result = container.limiter.hit(bucket, scope, rule)
+        result = container.limiter.hit(client_ip(request), scope, rule)
 
         if not result.allowed:
             _log.warning(

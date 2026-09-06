@@ -69,14 +69,13 @@ The frontend's copy of these shapes is `frontend/src/app/core/api/api.types.ts`.
 | GET | `/api/v1/auth/me` | The current account | Working |
 | POST | `/api/v1/chat/turn` | **Say something to the DM** | **Working** |
 | GET | `/api/v1/chat/sessions/{id}/messages` | Read a conversation | Working |
-| POST | `/api/v1/chat/sessions/{id}/debug-capture` | Opt in to prompt storage | Working |
 | GET/POST | `/api/v1/campaigns` | List / create | Working |
 | GET/PATCH/DELETE | `/api/v1/campaigns/{id}` | One campaign | Working |
 | GET/POST | `/api/v1/campaigns/{id}/characters` | List / create | Working |
 | GET/PATCH/DELETE | `/api/v1/characters/{id}` | One character | Working |
 | GET/PATCH | `/api/v1/settings` | Preferences | Working |
 | GET | `/api/v1/account/activity` | The user's own activity log | Working |
-| POST | `/api/v1/account/delete` | **Crypto-shred the account** | **Working** |
+| POST | `/api/v1/account/delete` | **Delete the account and all its data** | **Working** |
 | POST | `/api/v1/voice/transcribe` | Audio to text, locally | Working |
 
 ### Rules that cross the boundary
@@ -110,10 +109,10 @@ Both halves must uphold this. The full picture is [PRIVACY.md](PRIVACY.md).
 
 | | Frontend | Backend |
 |---|---|---|
-| **Must never hold** | An API key, an encryption key, another user's data | Plaintext personal data at rest |
-| **Must never log** | Message content, email addresses | Any field not on the allowlist |
+| **Must never hold** | An API key, another user's data | A password in any recoverable form |
+| **Must never log** | Message content, email addresses | A credential, or a request body |
 | **Must never put in a URL** | Anything personal | Anything personal |
-| **Must always** | Show the correlation ID on failure; mark stubs on screen | Encrypt in the repository layer; scrub outbound prompts |
+| **Must always** | Show the correlation ID on failure; mark stubs on screen | Check ownership in every query; use named SQL parameters |
 
 ### What actually crosses the network
 
@@ -122,8 +121,7 @@ Both halves must uphold this. The full picture is [PRIVACY.md](PRIVACY.md).
 | Browser | Backend | Plaintext messages | TLS, XSRF, rate limits |
 | Browser | Backend | Raw audio | TLS. **Goes no further** |
 | Backend | Gemini | Scrubbed prompt text | TLS, SSRF allowlist. **Leaves your control** |
-| Backend | RDS | Ciphertext only | TLS, one-address firewall |
-| Backend | KMS | Wrapped keys | TLS, OIDC identity |
+| Backend | Database | Rows | TLS, one-address firewall |
 
 **The row that matters is the third.** Everything else stays inside the
 boundary. Prompts sent to Google do not, and on the free tier Google's terms
@@ -151,7 +149,7 @@ this order makes every failure diagnosable in isolation.
 | 2 | **Python on Fly.io** | [DEPLOY_PYTHON_FLYIO.md](docs/DEPLOY_PYTHON_FLYIO.md) |
 | 3 | **Angular on Hostinger** | [DEPLOY_ANGULAR_HOSTINGER.md](docs/DEPLOY_ANGULAR_HOSTINGER.md) |
 | 4 | **Cloudflare** | [CLOUDFLARE_WAF_PROMPT.md](CLOUDFLARE_WAF_PROMPT.md) |
-| — | CORS, KMS identity, TLS, rollback | [DEPLOY_CROSS_CUTTING.md](docs/DEPLOY_CROSS_CUTTING.md) |
+| — | CORS, secrets, TLS, rollback | [DEPLOY_CROSS_CUTTING.md](docs/DEPLOY_CROSS_CUTTING.md) |
 
 **Nothing here has been deployed.** These are careful plans, not transcripts.
 The container images in particular have not been built — Docker was not
@@ -265,7 +263,6 @@ person using this will teach you more than any amount of further planning.
 **backend/docs/** — [Architecture](backend/docs/ARCHITECTURE.md) ·
 [Conventions](backend/docs/CONVENTIONS.md) ·
 [Database](backend/docs/DATABASE.md) ·
-[Database operations](backend/docs/DATABASE_OPERATIONS.md) ·
 [Security](backend/docs/SECURITY.md) ·
 [Observability](backend/docs/OBSERVABILITY.md) ·
 [Testing](backend/docs/TESTING.md) · [Gemini](backend/docs/GEMINI.md) ·

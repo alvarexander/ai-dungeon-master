@@ -176,6 +176,7 @@ def test_one_user_cannot_read_another_users_campaign(client, xsrf):
 def test_the_readiness_check_reports_insecure_settings(client):
     """Running with development shortcuts is stated out loud, not hidden."""
     body = client.get("/health/ready").json()
-    assert body["encryption_provider"] == "local"
     assert body["auth_mode"] == "stub"
-    assert len(body["warnings"]) >= 3
+    assert body["repository_backend"] == "memory"
+    # At minimum: stubbed authentication, and storage that vanishes on restart.
+    assert len(body["warnings"]) >= 2

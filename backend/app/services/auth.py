@@ -39,14 +39,14 @@ from uuid import UUID
 from app.core.errors import ApiError, AuthenticationError
 from app.core.logging import get_logger
 from app.core.security.passwords import hash_password, verify_dummy, verify_password
-from app.repositories.base import User
-from app.repositories.memory import MemoryUserRepository, new_id
+from app.repositories.base import User, UserRepository
+from app.repositories.memory import new_id
 from app.schemas.auth import LoginRequest, RegisterRequest
 from app.schemas.settings import UserSettings
 
 _log = get_logger("auth")
 
-STUB_TOKEN_PREFIX = "stub."
+STUB_TOKEN_PREFIX = "stub."  # noqa: S105 - a prefix marker, not a password
 
 # The account the frontend uses before anyone signs in, so that the chat works
 # the moment the server starts. Created by the seed script and at startup.
@@ -58,7 +58,7 @@ DEMO_PASSWORD = "demo-passphrase-not-secret"  # noqa: S105 - a local fixture, pu
 class AuthService:
     """Creates accounts, verifies credentials, and deletes accounts."""
 
-    def __init__(self, users: MemoryUserRepository) -> None:
+    def __init__(self, users: UserRepository) -> None:
         """Set up the service.
 
         Args:
@@ -157,29 +157,33 @@ class AuthService:
         return user
 
     async def delete_account(self, user_id: UUID) -> datetime:
-        """Delete an account by destroying its encryption key.
+        """Delete an account and everything belonging to it.
 
-        This is crypto-shredding. It does not go through the data deleting it;
-        it destroys the only key that can read it. Every encrypted byte
-        belonging to this account — live, in last night's backup, in a copy an
-        attacker may already hold — becomes permanently unreadable at the
-        moment this returns.
+        Campaigns, characters, play sessions and every message go with it. In
+        MySQL that happens through the ``ON DELETE CASCADE`` rules in the
+        schema; the in-memory store does the same by hand, so both leave the
+        same state behind.
+
+        **This does not reach into backups.** A database backup taken before
+        the deletion still contains the rows, encrypted. If a user asks for
+        genuine erasure everywhere, the backups have to age out — which is why
+        the retention period matters and is documented.
 
         Args:
-            user_id: Which account to destroy.
+            user_id: Which account to delete.
 
         Returns:
-            When the key was destroyed.
+            When the deletion happened.
 
         Raises:
             ApiError: If the account does not exist.
         """
         try:
-            shredded_at = await self._users.crypto_shred(user_id)
+            deleted_at = await self._users.delete(user_id)
         except KeyError as exc:
             raise ApiError(404, "not_found", "That account could not be found.") from exc
-        _log.info("account_crypto_shredded", user_id=str(user_id))
-        return shredded_at
+        _log.info("account_deleted", user_id=str(user_id))
+        return deleted_at
 
     # -----------------------------------------------------------------
     # The stubbed part. Everything above is production code.
@@ -187,7 +191,7 @@ class AuthService:
 
     @staticmethod
     def issue_token(user: User) -> str:
-        """Issue a session token. **STUB — not a real credential.**
+        """Issue a session token, which is a stub and not a real credential.
 
         Returns an unsigned string containing the account identifier. There is
         no signature, no expiry, and no way to revoke it. Anyone can construct
@@ -208,7 +212,7 @@ class AuthService:
 
     @staticmethod
     def user_id_from_token(token: str) -> UUID | None:
-        """Read the account identifier out of a token. **STUB — trusts it.**
+        """Read the account identifier out of a token, trusting it completely.
 
         Performs no verification whatsoever, because there is nothing to
         verify. See the module docstring.
@@ -228,7 +232,7 @@ class AuthService:
             return None
 
 
-async def ensure_demo_user(users: MemoryUserRepository) -> User:
+async def ensure_demo_user(users: UserRepository) -> User:
     """Create the demo account if it does not already exist.
 
     Phase 1 keeps everything in memory, so a restart empties the application.

@@ -1,12 +1,10 @@
 /**
  * The account screen: profile, activity, and deletion.
  *
- * THE ACTIVITY LOG IS NOT DECORATION
- * The design commits to telling people when their data is read. If support
- * ever decrypts someone's records, an entry appears in the list below saying
- * so, together with the reason that was given. This screen is where that
- * promise is kept, which is why it exists even though Phase 1 has almost
- * nothing to put in it yet.
+ * The deletion flow is the part worth care. It requires the username typed out
+ * and a tickbox, because it removes every campaign, character and conversation
+ * with no way back. Two deliberate steps on an irreversible action is cheap;
+ * an accidental click is not.
  */
 
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
@@ -40,15 +38,11 @@ import { StubNotice } from '../../shared/ui/stub-notice';
             <dt>Username</dt>
             <dd>
               {{ profile.username }}
-              <span class="small muted">stored as ordinary readable text</span>
             </dd>
 
             <dt>Email</dt>
             <dd>
               {{ profile.email }}
-              <span class="small muted">
-                encrypted at rest — decrypted only to show you this line
-              </span>
             </dd>
 
             <dt>Account identifier</dt>
@@ -66,8 +60,7 @@ import { StubNotice } from '../../shared/ui/stub-notice';
         <h2>Account activity</h2>
         <p class="small muted">
           Everything that has happened to your account, including any occasion on which
-          support has decrypted your data, and the reason they gave. If we look, you are
-          told.
+          you signed in or changed something.
         </p>
 
         @if (activity().length === 0) {
@@ -90,17 +83,14 @@ import { StubNotice } from '../../shared/ui/stub-notice';
       <section class="card danger-zone">
         <h2>Delete your account</h2>
 
-        <app-banner kind="danger" title="This cannot be undone by anyone, including us">
+        <app-banner kind="danger" title="This cannot be undone">
           <p style="margin: 0 0 8px">
-            Deleting your account destroys the encryption key that protects your data. At
-            that moment everything you have written becomes permanently unreadable — in the
-            live system, and in every backup, including backups nobody can reach into and
-            edit.
+            Deleting your account removes every campaign, every character and every
+            conversation. There is no way to get them back.
           </p>
           <p style="margin: 0" class="small">
-            This is called crypto-shredding. The data is not gone through and erased; the
-            only key that can read it is destroyed, which achieves the same thing everywhere
-            at once and cannot be reversed.
+            Backups taken before now may still hold your data until they age out of the
+            backup schedule.
           </p>
         </app-banner>
 
@@ -127,8 +117,7 @@ import { StubNotice } from '../../shared/ui/stub-notice';
               (change)="understood.set(!understood())"
             />
             <span class="small">
-              I understand this is permanent, and that not even the people running this
-              service can recover my campaigns afterwards.
+              I understand this is permanent and that my campaigns cannot be recovered.
             </span>
           </label>
 

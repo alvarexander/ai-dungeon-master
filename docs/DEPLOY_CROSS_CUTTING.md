@@ -93,128 +93,33 @@ your first deployment.
 
 ---
 
-## The second cross-cloud problem: authenticating to AWS
+## Secrets in production
 
-The first cross-cloud problem is reaching the database
-([its own document](DEPLOY_CROSS_CLOUD.md)). This is the other one, and it is
-less obvious.
+Two, and only two:
 
-**The problem.** Code running inside AWS gets credentials automatically. Our
-code runs on Fly.io, so it does not. But it must call KMS to unwrap user keys —
-without which it cannot read any user data at all.
-
-### The easy answer, and why not to use it
-
-Create a permanent IAM access key and store it with `fly secrets set`.
-
-It works. But that key is a password that never expires. If it leaks — into a
-log, a screenshot, a backup, a support ticket — it grants access until somebody
-notices and revokes it. And it sits in one place, so every machine shares one
-credential.
-
-### The right answer: OIDC federation
-
-Fly.io runs an identity service that hands each running machine a short-lived,
-signed document proving "I am machine X of app Y in organisation Z". AWS can be
-configured to trust that service.
-
-The backend presents the document to AWS Security Token Service and receives
-temporary credentials, **valid for fifteen minutes**, issued per machine.
-
-**There is no long-lived secret to leak.** That is the whole point.
-
-### Setting it up
-
-**1. Add Fly.io as an identity provider in AWS.**
-
-IAM → **Identity providers** → **Add provider** → **OpenID Connect**.
-
-| Field | Value |
+| Secret | Set with |
 |---|---|
-| Provider URL | `https://oidc.fly.io/<your-org-slug>` |
-| Audience | `sts.amazonaws.com` |
+| `GEMINI_API_KEY` | `fly secrets set GEMINI_API_KEY="..."` |
+| `DATABASE_URL` (contains the password) | `fly secrets set DATABASE_URL="..."` |
 
-Your organisation slug comes from `fly orgs list`.
-
-**2. Create the role the application will assume.**
-
-IAM → **Roles** → **Create role** → **Web identity**, choosing the provider you
-just added. Then edit its trust policy so that only *your* app can assume it:
-
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [{
-    "Effect": "Allow",
-    "Principal": { "Federated": "arn:aws:iam::ACCOUNT_ID:oidc-provider/oidc.fly.io/YOUR_ORG" },
-    "Action": "sts:AssumeRoleWithWebIdentity",
-    "Condition": {
-      "StringEquals": {
-        "oidc.fly.io/YOUR_ORG:aud": "sts.amazonaws.com",
-        "oidc.fly.io/YOUR_ORG:sub": "YOUR_ORG:ai-dungeon-master-api"
-      }
-    }
-  }]
-}
+```bash
+fly secrets set GEMINI_API_KEY="your-real-key"
+fly secrets set DATABASE_URL="mysql+aiomysql://dm:PASSWORD@host:3306/dungeon_master?ssl=true"
+fly secrets list      # names and digests only, never values
 ```
 
-**The `sub` condition is essential.** Without it, *any* application in your Fly
-organisation could assume this role.
+**Why this rather than putting them in `fly.toml`.** That file is committed to
+version control, and Git history is permanent and frequently made public later.
+A secret that has been committed must be treated as leaked and rotated, not
+merely deleted from the current version.
 
-**3. Give the role only what it needs.**
+Setting a secret restarts the application, so the new value takes effect
+immediately.
 
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [{
-    "Effect": "Allow",
-    "Action": ["kms:GenerateDataKey", "kms:Decrypt"],
-    "Resource": "arn:aws:kms:REGION:ACCOUNT:key/YOUR_KEY_ID"
-  }]
-}
-```
-
-Two actions, one key. Not `kms:*`, not `Resource: "*"`.
-
-**4. Tell the application.** Already in `fly.toml`:
-
-```
-AWS_ROLE_ARN = "arn:aws:iam::000000000000:role/dungeon-master-app"
-AWS_WEB_IDENTITY_TOKEN_FILE = "/.fly/oidc_token"
-```
-
-The AWS SDK sees these and does the rest. No code change.
-
-### Key custody: denying yourself access
-
-The project requires that your everyday administrator role **cannot** decrypt
-user data. On the KMS key policy:
-
-```json
-{
-  "Sid": "DenyDecryptToHumans",
-  "Effect": "Deny",
-  "Principal": "*",
-  "Action": ["kms:Decrypt", "kms:GenerateDataKey"],
-  "Resource": "*",
-  "Condition": {
-    "ArnNotEquals": {
-      "aws:PrincipalArn": [
-        "arn:aws:iam::ACCOUNT:role/dungeon-master-app",
-        "arn:aws:iam::ACCOUNT:role/dungeon-master-breakglass"
-      ]
-    }
-  }
-}
-```
-
-**This is deliberately inconvenient.** It means that if your own AWS
-credentials are phished, the attacker gets your infrastructure but not your
-users' data.
-
-**Set up the break-glass role before you need it**, requiring multi-factor
-authentication, with a CloudTrail alarm on every `Decrypt` it performs. And
-practise using it once, so that the first time is not during an incident.
+**If a secret does leak:** rotate it rather than hoping. Generate a new Gemini
+key and delete the old one at <https://aistudio.google.com/apikey>; change the
+database password and update the secret. Both take about two minutes, and both
+are far cheaper than the alternative.
 
 ---
 
@@ -308,7 +213,7 @@ pressure.
 
 **Databases move forward only.** This is why the expand-and-contract pattern
 exists — see
-[DATABASE_OPERATIONS.md](../backend/docs/DATABASE_OPERATIONS.md). Never write a
+[DATABASE.md](../backend/docs/DATABASE.md). Never write a
 migration that drops a column the current code still reads, because then the
 rollback is impossible rather than merely awkward.
 

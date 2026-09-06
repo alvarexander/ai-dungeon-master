@@ -94,21 +94,19 @@ async def account_activity(user: CurrentUser) -> list[ActivityEntry]:
 async def delete_account(
     payload: AccountDeletionRequest, user: CurrentUser, container: ContainerDep
 ) -> AccountDeletionResponse:
-    """Destroy the account's encryption key, making its data unreadable forever.
+    """Delete the account and everything belonging to it.
 
-    This is crypto-shredding, and it is worth being precise about what happens,
-    because it is counterintuitive.
-
-    The data is **not** erased. What is destroyed is the one key that can read
-    it. Every encrypted byte belonging to this account — in the live database,
-    in last night's backup, in a snapshot from March, in a copy an attacker may
-    already have stolen — becomes permanently undecryptable at the instant this
-    returns. Not hidden, not flagged as deleted: mathematically unrecoverable,
-    by us as much as by anyone else.
+    Campaigns, characters, play sessions and every message are removed. In
+    MySQL that happens through the ``ON DELETE CASCADE`` rules in the schema,
+    so nothing is left behind for a later cleanup job to forget.
 
     The link to the account's analytics is severed in the same operation. Past
     activity keeps contributing to aggregate totals, but nothing can ever
     attribute it to a person again.
+
+    **One honest limitation:** this does not reach into database backups. A
+    backup taken before the deletion still holds the rows, encrypted, until it
+    ages out of the retention window.
 
     Args:
         payload: The typed confirmation.
@@ -130,16 +128,16 @@ async def delete_account(
             "understand this cannot be undone.",
         )
 
-    container.analytics.sever(user.user_id)
-    shredded_at = await container.auth.delete_account(user.user_id)
+    container.analytics.forget(user.user_id)
+    deleted_at = await container.auth.delete_account(user.user_id)
 
     return AccountDeletionResponse(
         user_id=str(user.user_id),
-        shredded_at=shredded_at.isoformat().replace("+00:00", "Z"),
+        deleted_at=deleted_at.isoformat().replace("+00:00", "Z"),
         detail=(
-            "Your encryption key has been destroyed. Every piece of your data — in the "
-            "live system and in every backup — is now permanently unreadable, including "
-            "by us. Your past activity remains in anonymous totals that can never be "
-            "traced back to you."
+            "Your account has been deleted, along with every campaign, character and "
+            "conversation. Your past activity remains only as anonymous totals that "
+            "cannot be traced back to you. Database backups taken before now still hold "
+            "your data in encrypted form until they age out."
         ),
     )

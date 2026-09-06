@@ -53,13 +53,9 @@ voice = [
     "faster-whisper>=1.0.3",
 ]
 
-# AWS integration for Phase 2: KMS key wrapping and Secrets Manager.
-# Not needed to run locally.
-aws = [
-    "boto3>=1.35",
-]
-
-# The database layer, for Phase 2. Phase 1 uses an in-memory store.
+# MySQL support. Install with `uv sync --extra db` and set
+# REPOSITORY_BACKEND=mysql to store data in a real database instead of memory.
+# See docs/LOCAL_MYSQL.md.
 db = [
     "sqlalchemy[asyncio]>=2.0",
     "aiomysql>=0.2",

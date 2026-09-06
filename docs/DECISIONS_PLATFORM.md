@@ -164,54 +164,68 @@ buys less than it costs. The full comparison, with the reasoning for when you
 **Cost to reverse.** Cheap. Moving to Tailscale later changes a connection
 string and a firewall rule.
 
----
-
----
-
-## ADR-012 — AWS credentials on Fly.io: OIDC federation, no stored keys
-
-**The question.** The backend must call AWS KMS to unwrap user keys. Code
-running *inside* AWS gets credentials automatically. Our code runs on Fly.io, so
-it does not. How does it authenticate without us pasting a permanent AWS key
-into a config file?
-
-**The decision.** **OpenID Connect federation.** Fly.io runs an identity service
-that hands each running machine a short-lived, signed document proving "I am
-machine X of app Y in org Z". AWS is configured to trust that service. The
-backend presents the document to AWS and receives temporary credentials valid
-for fifteen minutes.
-
-**Why this is materially better than the easy path.** The easy path is creating
-a permanent AWS access key and storing it as a Fly secret. That key is a
-password that never expires. If it leaks — into a log, a screenshot, a backup —
-it grants access until you notice and revoke it. With OIDC there is no
-long-lived secret to leak: credentials expire in fifteen minutes and are issued
-per machine.
-
-This also completes ADR-002's key-custody requirement. Because AWS knows
-*which* workload is asking, the KMS policy can grant decryption to the
-application role and refuse it to your own administrator account.
-
-**Cost to reverse.** Cheap. Falling back to a static key is a config change, and
-is documented as the escape hatch if OIDC setup stalls.
+**A cheaper option that avoids the problem entirely.** Putting the database on
+Hostinger — where you are already paying for hosting — means there is no AWS
+network to reach into, and this decision does not apply. See
+[DEPLOY_MYSQL_HOSTINGER.md](DEPLOY_MYSQL_HOSTINGER.md).
 
 ---
 
 ---
 
-## ADR-013 — Phase 1 runs with no database
+## ADR-013 — Two storage backends behind one interface
 
-**The question.** You asked for a working prototype today, but explicitly ruled
-out wiring up a live database.
+**The question.** You want to run this immediately, without installing a
+database first — but you also want data that survives a restart.
 
-**The decision.** The repository layer has two implementations behind one
-interface: the real one (SQL, encryption, KMS) and an in-memory one used in
-Phase 1. Switching is one environment variable.
+**The decision.** Two implementations of the same repository interfaces. An
+in-memory store is the default; MySQL is one environment variable away.
 
-**Why this is not throwaway work.** The in-memory implementation runs the *same*
-encryption code against a local development key. So the encryption path is
-genuinely exercised from day one rather than being a diagram that gets tested
-for the first time on deployment day. When the database is connected in Phase 2,
-the layer above it does not change.
+```
+REPOSITORY_BACKEND=memory   # nothing to install, lost on restart  (default)
+REPOSITORY_BACKEND=mysql    # real database, survives restarts
+```
+
+**Why both rather than picking one.** Requiring MySQL before anything runs puts
+a database installation between a newcomer and their first working page, which
+is exactly the point at which people give up. Shipping only the in-memory store
+would mean the real storage path was untested until deployment day.
+
+Both satisfy the interfaces in `repositories/base.py`, so nothing above that
+layer knows which one it got. `docs/LOCAL_MYSQL.md` walks through installing
+MySQL locally.
+
+**What is genuinely different between them.** Only where the bytes land. The
+same ownership checks, the same sequence-number locking, the same cascade
+behaviour on deletion.
 
 **Cost to reverse.** Cheap — that is the point of the interface.
+
+---
+
+## ADR-014 — Plain SQL, not an ORM
+
+**The question.** How does the MySQL implementation talk to the database?
+
+**The decision.** Hand-written SQL with named parameters, through SQLAlchemy's
+connection handling but not its object mapper.
+
+**Why.** An ORM (Object Relational Mapper) turns rows into objects
+automatically. It saves typing on large projects and hides what is actually
+happening — which is the wrong trade when someone is learning. Every query in
+`repositories/sql.py` can be read, copied into a database client, and run. When
+something is slow or wrong, the thing to look at is right there.
+
+It also removes a category of surprise: no lazy loading, no session-flush
+ordering, no wondering which attribute access triggered a query.
+
+**What was rejected.** SQLAlchemy's ORM, and stored procedures. Stored
+procedures were in an earlier version and were removed — they put the logic in
+a second place, they are awkward to review in a pull request, and some shared
+hosting plans do not permit creating them at all.
+
+**The one rule that is not negotiable.** Every query uses named parameters —
+`:user_id`, never an f-string. That is what makes SQL injection impossible, and
+it is the most common serious web vulnerability.
+
+**Cost to reverse.** Moderate.

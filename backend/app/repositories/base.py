@@ -1,27 +1,29 @@
 """Domain objects and the repository contracts that store them.
 
-WHAT A REPOSITORY IS AND WHY IT MATTERS HERE
+WHAT A REPOSITORY IS
+
 A repository is the only code allowed to touch storage. Everything above it —
 the game rules, the endpoints — works with ordinary Python objects and never
 writes a line of SQL.
 
-In most projects that is a tidiness argument. Here it is a security control.
-Encryption happens inside the repository, on the way in and out. Because the
-repository is the *only* door to storage, it is impossible to save a user's
-email without passing through the code that encrypts it. Correctness stops
-depending on whether whoever writes the next endpoint remembers to encrypt —
-there is no path that skips it.
+That keeps storage decisions in one place. Swapping the in-memory store for
+MySQL changes only the classes in this folder; no service and no endpoint is
+aware it happened.
 
-WHERE THIS SITS RELATIVE TO THE DATABASE LAYER
-Above it. The domain objects below hold plaintext. The repository converts them
-to ciphertext and hands the ciphertext to storage. So plaintext never travels
-to the database server, never appears in a query log, and never crosses the
-network between Fly.io and AWS.
+TWO IMPLEMENTATIONS
 
-PHASE 1 AND PHASE 2
-`app/repositories/memory.py` implements these contracts in memory. Phase 2 adds
-a SQL implementation. Both encrypt identically, at the same boundary; only the
-place the ciphertext lands differs.
+`memory.py` keeps everything in dictionaries and needs nothing installed. It is
+the default, and it loses everything on restart.
+
+`sql.py` stores rows in MySQL. Set `REPOSITORY_BACKEND=mysql` to use it; see
+`docs/LOCAL_MYSQL.md` for installing MySQL locally.
+
+A NOTE ON OWNERSHIP CHECKS
+
+Every method that fetches something takes a `user_id` as well as the thing's
+own identifier, and checks both. That is what stops somebody reading another
+person's campaign by guessing an identifier, and it is why the interfaces look
+slightly repetitive.
 """
 
 from __future__ import annotations
@@ -52,14 +54,15 @@ class User:
     """One account, with personal fields in plaintext.
 
     This object only ever exists in memory, inside a request. The repository
-    encrypts every field marked below before anything is stored.
+    encrypts every field marked below before anything is stored, so the
+    database never sees a readable email address.
     """
 
     user_id: UUID
     username: str  # plaintext by classification
     display_name: str  # plaintext by classification
-    email: str  # ENCRYPTED at rest
-    password_hash: str  # HASHED, never encrypted
+    email: str
+    password_hash: str  # Argon2id digest. The password itself is never stored.
     email_verified: bool = False
     created_at: datetime = field(default_factory=utc_now)
     status: str = "active"
@@ -73,8 +76,8 @@ class Campaign:
 
     campaign_id: UUID
     user_id: UUID
-    title: str  # ENCRYPTED at rest
-    premise: str | None  # ENCRYPTED at rest
+    title: str
+    premise: str | None
     ruleset: str = "dnd5e"
     tone: str = "heroic"
     status: str = "active"
@@ -89,10 +92,10 @@ class Character:
     character_id: UUID
     campaign_id: UUID
     user_id: UUID
-    name: str  # ENCRYPTED at rest
-    character_class: str  # plaintext, not personal
-    level: int  # plaintext, not personal
-    sheet: dict[str, Any]  # ENCRYPTED at rest, stored as JSON
+    name: str
+    character_class: str
+    level: int
+    sheet: dict[str, Any]  # stored as JSON
     created_at: datetime = field(default_factory=utc_now)
     updated_at: datetime = field(default_factory=utc_now)
 
@@ -107,17 +110,13 @@ class GameSession:
     started_at: datetime = field(default_factory=utc_now)
     ended_at: datetime | None = None
     turn_count: int = 0
-    debug_capture: bool = False
-    debug_capture_until: datetime | None = None
 
 
 @dataclass(slots=True)
 class Message:
     """One line of the transcript.
 
-    ``content`` is personal data. Players type their own names, their friends'
-    names, and whatever else into it, which is why it is encrypted with the
-    same care as an email address.
+    ``content`` is what the player and the Dungeon Master actually said.
     """
 
     message_id: UUID
@@ -125,7 +124,7 @@ class Message:
     user_id: UUID
     seq: int
     role: str
-    content: str  # ENCRYPTED at rest
+    content: str
     input_mode: str = "typed"
     token_count: int = 0
     created_at: datetime = field(default_factory=utc_now)
@@ -194,14 +193,18 @@ class UserRepository(Protocol):
         """
         ...
 
-    async def crypto_shred(self, user_id: UUID) -> datetime:
-        """Destroy the account's encryption key, rendering its data unreadable.
+    async def delete(self, user_id: UUID) -> datetime:
+        """Delete an account and everything belonging to it.
+
+        Campaigns, characters, sessions and messages all go with it, through
+        the ``ON DELETE CASCADE`` rules in the schema. There is nothing left
+        afterwards.
 
         Args:
             user_id: Which account.
 
         Returns:
-            When the key was destroyed.
+            When the deletion happened.
         """
         ...
 
@@ -386,15 +389,3 @@ class SessionRepository(Protocol):
         """
         ...
 
-    async def set_debug_capture(self, user_id: UUID, session_id: UUID, enabled: bool) -> GameSession | None:
-        """Turn the opt-in prompt capture on or off for a session.
-
-        Args:
-            user_id: The owner.
-            session_id: Which session.
-            enabled: Whether to capture.
-
-        Returns:
-            The updated session, or ``None`` if it does not exist.
-        """
-        ...

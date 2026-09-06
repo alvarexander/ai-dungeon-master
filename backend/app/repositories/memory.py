@@ -1,21 +1,33 @@
-"""In-memory storage for Phase 1, encrypting exactly as the database will.
+"""In-memory storage for local development.
 
-WHY THIS IS NOT A TOY
-It would have been easier to store plain Python objects in a dictionary and add
-encryption later. That was rejected deliberately. This implementation runs the
-real encryption code on every write and the real decryption code on every read,
-against the local development key. The result is that the encryption path is
-exercised from the first day rather than being a diagram that gets tested for
-the first time on deployment day.
+WHAT THIS IS
 
-What is genuinely temporary is only *where the bytes land*: a dictionary in this
-process instead of MySQL. Everything above this file — services, endpoints —
-will not change when the database arrives.
+A set of Python dictionaries standing in for database tables. It needs nothing
+installed, which makes it the right default for getting the application running
+in one command.
 
-WHAT "RESTART LOSES EVERYTHING" MEANS FOR YOU
-There is no file and no database. Stop the server and every campaign, character
-and transcript is gone. That is expected in Phase 1 and is why the seed script
-exists: run it to get a populated demo account back in one command.
+**Everything is lost when the server restarts.** There is no file and no
+database. That is expected here — run `scripts/seed_dev_data.py` to get
+populated demo accounts back in one command.
+
+WHEN TO USE THE REAL DATABASE INSTEAD
+
+Set `REPOSITORY_BACKEND=mysql` once you want data to survive a restart.
+`docs/LOCAL_MYSQL.md` walks through installing MySQL locally. Both
+implementations satisfy the same interfaces in `base.py`, so nothing above this
+layer changes when you switch.
+
+A NOTE ON HOW DATA IS PROTECTED
+
+Personal data is stored as ordinary readable values, here and in MySQL.
+Protection comes from the layers around it: passwords are hashed with Argon2id
+and never stored, the connection to the database uses TLS, access is
+restricted by firewall, and the database provider encrypts its disks. That is
+the same posture as most well-built web applications.
+
+What it means concretely: **anyone with database access can read email
+addresses and conversations.** Keep database credentials as carefully as you
+would keep a password. See `docs/SECURITY.md`.
 """
 
 from __future__ import annotations
@@ -26,8 +38,6 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID, uuid4
 
-from app.core.security.blind_index import BlindIndexService
-from app.core.security.crypto import EncryptionService, FieldRef, WrappedKey
 from app.repositories.base import (
     Campaign,
     Character,
@@ -38,42 +48,44 @@ from app.repositories.base import (
 )
 from app.schemas.settings import UserSettings
 
-# The columns this store encrypts, named exactly as they are in the SQL schema
-# so that the binding between ciphertext and its location matches what the
-# database will use. Change one and the other must change with it.
-F_EMAIL = FieldRef("users", "email")
-F_CAMPAIGN_TITLE = FieldRef("campaigns", "title")
-F_CAMPAIGN_PREMISE = FieldRef("campaigns", "premise")
-F_CHARACTER_NAME = FieldRef("characters", "name")
-F_CHARACTER_SHEET = FieldRef("characters", "sheet")
-F_MESSAGE_CONTENT = FieldRef("messages", "content")
+
+def normalize_email(email: str) -> str:
+    """Put an email address into one canonical form for lookups.
+
+    Without this, ``Alex@Example.com`` and ``alex@example.com`` would register
+    as two separate accounts. Email domains are case-insensitive by
+    specification, and every mail provider in practice treats the local part
+    that way too.
+
+    Args:
+        email: The address as the user typed it.
+
+    Returns:
+        The address trimmed and lowercased.
+    """
+    return email.strip().lower()
 
 
 class MemoryStore:
-    """The shared in-memory tables. One instance for the whole application.
-
-    Holds ciphertext, exactly as MySQL would. If you inspect this object in a
-    debugger you will see byte strings, not email addresses — which is the
-    point, and a useful way to convince yourself the encryption is real.
-    """
+    """The shared in-memory tables. One instance for the whole application."""
 
     def __init__(self) -> None:
         """Create empty tables."""
         self.users: dict[UUID, dict[str, Any]] = {}
-        self.email_bidx_index: dict[bytes, UUID] = {}
+        self.email_index: dict[str, UUID] = {}
         self.username_index: dict[str, UUID] = {}
         self.campaigns: dict[UUID, dict[str, Any]] = {}
         self.characters: dict[UUID, dict[str, Any]] = {}
         self.sessions: dict[UUID, dict[str, Any]] = {}
         self.messages: dict[UUID, dict[str, Any]] = {}
-        # Guards the sequence-number assignment, which is the one place two
-        # concurrent requests could otherwise collide.
+        # Guards sequence-number assignment, the one place two concurrent
+        # requests could otherwise collide.
         self.lock = asyncio.Lock()
 
     def clear(self) -> None:
         """Empty every table. Used by tests and by the seed script."""
         self.users.clear()
-        self.email_bidx_index.clear()
+        self.email_index.clear()
         self.username_index.clear()
         self.campaigns.clear()
         self.characters.clear()
@@ -82,32 +94,23 @@ class MemoryStore:
 
 
 class MemoryUserRepository:
-    """Accounts, with personal fields encrypted at this boundary."""
+    """Accounts."""
 
-    def __init__(
-        self, store: MemoryStore, encryption: EncryptionService, blind_index: BlindIndexService
-    ) -> None:
+    def __init__(self, store: MemoryStore) -> None:
         """Set up the repository.
 
         Args:
             store: The shared in-memory tables.
-            encryption: Turns plaintext into ciphertext and back.
-            blind_index: Produces the searchable email fingerprint.
         """
         self._store = store
-        self._encryption = encryption
-        self._blind_index = blind_index
 
     async def create(self, user: User, password_hash: str) -> User:
-        """Store a new account, minting an encryption key for it.
-
-        Every new account gets its own Data Encryption Key here. That is what
-        makes deletion possible later: destroy this one key and everything the
-        account ever writes becomes unreadable.
+        """Store a new account.
 
         Args:
-            user: The account to store, with plaintext fields.
-            password_hash: The Argon2id digest of their password.
+            user: The account to store.
+            password_hash: The Argon2id digest of their password. The password
+                itself is never stored, in any form.
 
         Returns:
             The stored account.
@@ -115,55 +118,42 @@ class MemoryUserRepository:
         Raises:
             ValueError: If the username or email is already taken.
         """
-        email_bidx = self._blind_index.email_index(user.email)
-        if email_bidx in self._store.email_bidx_index:
+        email = normalize_email(user.email)
+        if email in self._store.email_index:
             raise ValueError("email_taken")
         if user.username.lower() in self._store.username_index:
             raise ValueError("username_taken")
 
-        wrapped, cipher = self._encryption.create_user_key(user.user_id)
-
         self._store.users[user.user_id] = {
-            # Plaintext by classification.
             "username": user.username,
             "display_name": user.display_name,
+            "email": email,
             "email_verified": user.email_verified,
             "created_at": user.created_at,
             "status": "active",
             "settings": user.settings.model_dump(),
-            # Hashed — one way, never reversible.
+            # Hashed, one way. This is the one value that is never recoverable.
             "password_hash": password_hash,
-            # Blind index — searchable fingerprint, not reversible.
-            "email_bidx": email_bidx,
-            # Encrypted — this is ciphertext from here on.
-            "email_ct": cipher.encrypt(F_EMAIL, user.email),
-            # The wrapped key. Setting this to None is account deletion.
-            "dek": wrapped,
         }
-        self._store.email_bidx_index[email_bidx] = user.user_id
+        self._store.email_index[email] = user.user_id
         self._store.username_index[user.username.lower()] = user.user_id
         return user
 
     def _hydrate(self, user_id: UUID, row: dict[str, Any]) -> User:
-        """Turn a stored row back into a domain object, decrypting as it goes.
+        """Turn a stored row back into a domain object.
 
         Args:
             user_id: Which account the row belongs to.
             row: The stored row.
 
         Returns:
-            The account with plaintext fields.
-
-        Raises:
-            CryptoShreddedError: If the account has been deleted, in which case
-                its data is permanently unreadable.
+            The account.
         """
-        cipher = self._encryption.cipher_for(user_id, row["dek"])
         return User(
             user_id=user_id,
             username=row["username"],
             display_name=row["display_name"],
-            email=cipher.decrypt(F_EMAIL, row["email_ct"]),
+            email=row["email"],
             password_hash=row["password_hash"],
             email_verified=row["email_verified"],
             created_at=row["created_at"],
@@ -172,38 +162,31 @@ class MemoryUserRepository:
         )
 
     async def get(self, user_id: UUID) -> User | None:
-        """Fetch an account and decrypt its fields.
+        """Fetch an account.
 
         Args:
             user_id: Which account.
 
         Returns:
-            The account, or ``None`` if there is no such account or it has been
-            shredded.
+            The account, or ``None`` if there is no such account.
         """
         row = self._store.users.get(user_id)
-        if row is None or row["dek"] is None:
-            return None
-        return self._hydrate(user_id, row)
+        return self._hydrate(user_id, row) if row is not None else None
 
     async def find_by_email(self, email: str) -> User | None:
-        """Look up an account by email address, without comparing addresses.
-
-        The address is turned into a fingerprint first. The stored ciphertext
-        is never compared — it could not be, since encrypting the same address
-        twice produces different bytes.
+        """Look up an account by email address.
 
         Args:
-            email: The address to find.
+            email: The address to find, in any capitalisation.
 
         Returns:
             The account, or ``None``.
         """
-        user_id = self._store.email_bidx_index.get(self._blind_index.email_index(email))
+        user_id = self._store.email_index.get(normalize_email(email))
         return await self.get(user_id) if user_id else None
 
     async def find_by_username(self, username: str) -> User | None:
-        """Look up an account by its plaintext username.
+        """Look up an account by username.
 
         Args:
             username: The handle to find.
@@ -217,9 +200,6 @@ class MemoryUserRepository:
     async def update_settings(self, user_id: UUID, settings: UserSettings) -> UserSettings:
         """Replace a user's preferences.
 
-        Settings are enumerated values and booleans, so they are stored in
-        plaintext and this needs no key at all.
-
         Args:
             user_id: Which account.
             settings: The complete new settings.
@@ -230,72 +210,52 @@ class MemoryUserRepository:
         Raises:
             KeyError: If the account does not exist.
         """
-        row = self._store.users[user_id]
-        row["settings"] = settings.model_dump()
+        self._store.users[user_id]["settings"] = settings.model_dump()
         return settings
 
-    async def crypto_shred(self, user_id: UUID) -> datetime:
-        """Delete an account by destroying its encryption key.
-
-        Look at what this method does not do. It never touches the campaigns,
-        the characters, or the transcripts. It removes one small field — the
-        wrapped key — and at that instant every encrypted byte belonging to
-        this account becomes permanently undecryptable, here and in any backup
-        that was ever taken.
+    async def delete(self, user_id: UUID) -> datetime:
+        """Delete an account and everything belonging to it.
 
         Args:
             user_id: Which account.
 
         Returns:
-            When the key was destroyed.
+            When the deletion happened.
 
         Raises:
             KeyError: If the account does not exist.
         """
-        row = self._store.users[user_id]
-        row["dek"] = None
-        row["status"] = "shredded"
-        # Remove the lookup entries so the account cannot be found again.
-        self._store.email_bidx_index.pop(row["email_bidx"], None)
+        row = self._store.users.pop(user_id)
+        self._store.email_index.pop(row["email"], None)
         self._store.username_index.pop(row["username"].lower(), None)
-        # Drop the cached key, so a decryption cannot succeed for the next few
-        # minutes on the strength of a cache entry.
-        self._encryption.forget(user_id)
+
+        # In MySQL this happens through ON DELETE CASCADE. Here it is done by
+        # hand, so both implementations leave the same state behind.
+        for table in (
+            self._store.campaigns,
+            self._store.characters,
+            self._store.sessions,
+            self._store.messages,
+        ):
+            for key in [k for k, v in table.items() if v.get("user_id") == user_id]:
+                del table[key]
+
         return datetime.now(UTC)
-
-    def _cipher(self, user_id: UUID) -> Any:
-        """Get the cipher for a user, for use by the sibling repositories.
-
-        Args:
-            user_id: Whose key is needed.
-
-        Returns:
-            A cipher scoped to that user.
-
-        Raises:
-            KeyError: If the account does not exist.
-        """
-        row = self._store.users[user_id]
-        return self._encryption.cipher_for(user_id, row["dek"])
 
 
 class MemoryCampaignRepository:
-    """Campaigns, with the title and premise encrypted."""
+    """Campaigns."""
 
-    def __init__(self, store: MemoryStore, users: MemoryUserRepository) -> None:
+    def __init__(self, store: MemoryStore) -> None:
         """Set up the repository.
 
         Args:
             store: The shared in-memory tables.
-            users: Used to obtain the owning user's cipher. Campaign data is
-                encrypted under the *owner's* key, which is what makes deleting
-                the owner destroy their campaigns too.
         """
         self._store = store
-        self._users = users
 
     async def create(self, campaign: Campaign) -> Campaign:
-        """Store a new campaign, encrypting its free-text fields.
+        """Store a new campaign.
 
         Args:
             campaign: The campaign to store.
@@ -303,13 +263,10 @@ class MemoryCampaignRepository:
         Returns:
             The stored campaign.
         """
-        cipher = self._users._cipher(campaign.user_id)  # noqa: SLF001 - same layer
         self._store.campaigns[campaign.campaign_id] = {
             "user_id": campaign.user_id,
-            "title_ct": cipher.encrypt(F_CAMPAIGN_TITLE, campaign.title),
-            "premise_ct": (
-                cipher.encrypt(F_CAMPAIGN_PREMISE, campaign.premise) if campaign.premise else None
-            ),
+            "title": campaign.title,
+            "premise": campaign.premise,
             "ruleset": campaign.ruleset,
             "tone": campaign.tone,
             "status": campaign.status,
@@ -318,24 +275,22 @@ class MemoryCampaignRepository:
         }
         return campaign
 
-    def _hydrate(self, campaign_id: UUID, row: dict[str, Any]) -> Campaign:
-        """Decrypt a stored campaign row.
+    @staticmethod
+    def _hydrate(campaign_id: UUID, row: dict[str, Any]) -> Campaign:
+        """Turn a stored row back into a domain object.
 
         Args:
             campaign_id: Which campaign.
             row: The stored row.
 
         Returns:
-            The campaign with plaintext fields.
+            The campaign.
         """
-        cipher = self._users._cipher(row["user_id"])  # noqa: SLF001
         return Campaign(
             campaign_id=campaign_id,
             user_id=row["user_id"],
-            title=cipher.decrypt(F_CAMPAIGN_TITLE, row["title_ct"]),
-            premise=(
-                cipher.decrypt(F_CAMPAIGN_PREMISE, row["premise_ct"]) if row["premise_ct"] else None
-            ),
+            title=row["title"],
+            premise=row["premise"],
             ruleset=row["ruleset"],
             tone=row["tone"],
             status=row["status"],
@@ -364,10 +319,6 @@ class MemoryCampaignRepository:
     ) -> tuple[list[Campaign], int]:
         """List a user's campaigns, most recently updated first.
 
-        Ordering is by timestamp rather than title, because titles are
-        ciphertext and cannot be sorted before decryption. This is the concrete
-        everyday cost of encrypting free text, and it is why pages are capped.
-
         Args:
             user_id: The owner.
             limit: Page size.
@@ -386,7 +337,7 @@ class MemoryCampaignRepository:
         return [self._hydrate(cid, row) for cid, row in page], len(rows)
 
     async def update(self, campaign: Campaign) -> Campaign:
-        """Save changes to a campaign, re-encrypting the text fields.
+        """Save changes to a campaign.
 
         Args:
             campaign: The campaign with its new values.
@@ -397,16 +348,11 @@ class MemoryCampaignRepository:
         Raises:
             KeyError: If the campaign does not exist.
         """
-        cipher = self._users._cipher(campaign.user_id)  # noqa: SLF001
         row = self._store.campaigns[campaign.campaign_id]
         row.update(
             {
-                "title_ct": cipher.encrypt(F_CAMPAIGN_TITLE, campaign.title),
-                "premise_ct": (
-                    cipher.encrypt(F_CAMPAIGN_PREMISE, campaign.premise)
-                    if campaign.premise
-                    else None
-                ),
+                "title": campaign.title,
+                "premise": campaign.premise,
                 "tone": campaign.tone,
                 "status": campaign.status,
                 "updated_at": utc_now(),
@@ -436,25 +382,18 @@ class MemoryCampaignRepository:
 
 
 class MemoryCharacterRepository:
-    """Characters, with the name and sheet encrypted and the class in plaintext."""
+    """Player characters."""
 
-    def __init__(self, store: MemoryStore, users: MemoryUserRepository) -> None:
+    def __init__(self, store: MemoryStore) -> None:
         """Set up the repository.
 
         Args:
             store: The shared in-memory tables.
-            users: Source of the owning user's cipher.
         """
         self._store = store
-        self._users = users
 
     async def create(self, character: Character) -> Character:
         """Store a new character.
-
-        Note the split: ``name`` and ``sheet`` are encrypted because a player
-        may put a real person's name in either. ``character_class`` and
-        ``level`` are plaintext because "level 4 rogue" identifies nobody, and
-        keeping them readable means aggregate questions need no decryption.
 
         Args:
             character: The character to store.
@@ -462,12 +401,11 @@ class MemoryCharacterRepository:
         Returns:
             The stored character.
         """
-        cipher = self._users._cipher(character.user_id)  # noqa: SLF001
         self._store.characters[character.character_id] = {
             "campaign_id": character.campaign_id,
             "user_id": character.user_id,
-            "name_ct": cipher.encrypt(F_CHARACTER_NAME, character.name),
-            "sheet_ct": cipher.encrypt_json(F_CHARACTER_SHEET, character.sheet),
+            "name": character.name,
+            "sheet": character.sheet,
             "char_class": character.character_class,
             "char_level": character.level,
             "created_at": character.created_at,
@@ -475,25 +413,25 @@ class MemoryCharacterRepository:
         }
         return character
 
-    def _hydrate(self, character_id: UUID, row: dict[str, Any]) -> Character:
-        """Decrypt a stored character row.
+    @staticmethod
+    def _hydrate(character_id: UUID, row: dict[str, Any]) -> Character:
+        """Turn a stored row back into a domain object.
 
         Args:
             character_id: Which character.
             row: The stored row.
 
         Returns:
-            The character with plaintext fields.
+            The character.
         """
-        cipher = self._users._cipher(row["user_id"])  # noqa: SLF001
         return Character(
             character_id=character_id,
             campaign_id=row["campaign_id"],
             user_id=row["user_id"],
-            name=cipher.decrypt(F_CHARACTER_NAME, row["name_ct"]),
+            name=row["name"],
             character_class=row["char_class"],
             level=row["char_level"],
-            sheet=cipher.decrypt_json(F_CHARACTER_SHEET, row["sheet_ct"]),
+            sheet=row["sheet"],
             created_at=row["created_at"],
             updated_at=row["updated_at"],
         )
@@ -541,12 +479,11 @@ class MemoryCharacterRepository:
         Raises:
             KeyError: If the character does not exist.
         """
-        cipher = self._users._cipher(character.user_id)  # noqa: SLF001
         row = self._store.characters[character.character_id]
         row.update(
             {
-                "name_ct": cipher.encrypt(F_CHARACTER_NAME, character.name),
-                "sheet_ct": cipher.encrypt_json(F_CHARACTER_SHEET, character.sheet),
+                "name": character.name,
+                "sheet": character.sheet,
                 "char_level": character.level,
                 "updated_at": utc_now(),
             }
@@ -571,17 +508,15 @@ class MemoryCharacterRepository:
 
 
 class MemorySessionRepository:
-    """Play sessions and transcripts, with message content encrypted."""
+    """Play sessions and their transcripts."""
 
-    def __init__(self, store: MemoryStore, users: MemoryUserRepository) -> None:
+    def __init__(self, store: MemoryStore) -> None:
         """Set up the repository.
 
         Args:
             store: The shared in-memory tables.
-            users: Source of the owning user's cipher.
         """
         self._store = store
-        self._users = users
 
     async def create_session(self, session: GameSession) -> GameSession:
         """Start a new play session.
@@ -598,8 +533,6 @@ class MemorySessionRepository:
             "started_at": session.started_at,
             "ended_at": None,
             "turn_count": 0,
-            "debug_capture": False,
-            "debug_capture_until": None,
         }
         return session
 
@@ -623,8 +556,6 @@ class MemorySessionRepository:
             started_at=row["started_at"],
             ended_at=row["ended_at"],
             turn_count=row["turn_count"],
-            debug_capture=row["debug_capture"],
-            debug_capture_until=row["debug_capture_until"],
         )
 
     async def append_message(self, message: Message) -> Message:
@@ -640,10 +571,10 @@ class MemorySessionRepository:
         Returns:
             The stored message with its sequence number set.
         """
-        cipher = self._users._cipher(message.user_id)  # noqa: SLF001
         async with self._store.lock:
             existing = [
-                row for row in self._store.messages.values()
+                row
+                for row in self._store.messages.values()
                 if row["game_session_id"] == message.game_session_id
             ]
             seq = max((row["seq"] for row in existing), default=0) + 1
@@ -652,7 +583,7 @@ class MemorySessionRepository:
                 "user_id": message.user_id,
                 "seq": seq,
                 "role": message.role,
-                "content_ct": cipher.encrypt(F_MESSAGE_CONTENT, message.content),
+                "content": message.content,
                 "input_mode": message.input_mode,
                 "token_count": message.token_count,
                 "created_at": message.created_at,
@@ -665,7 +596,7 @@ class MemorySessionRepository:
     async def list_messages(
         self, user_id: UUID, session_id: UUID, after_seq: int, limit: int
     ) -> list[Message]:
-        """Read a page of a transcript, decrypting each message.
+        """Read a page of a transcript.
 
         Args:
             user_id: The owner.
@@ -676,7 +607,6 @@ class MemorySessionRepository:
         Returns:
             The messages, in order.
         """
-        cipher = self._users._cipher(user_id)  # noqa: SLF001
         rows = [
             (mid, row)
             for mid, row in self._store.messages.items()
@@ -692,37 +622,13 @@ class MemorySessionRepository:
                 user_id=user_id,
                 seq=row["seq"],
                 role=row["role"],
-                content=cipher.decrypt(F_MESSAGE_CONTENT, row["content_ct"]),
+                content=row["content"],
                 input_mode=row["input_mode"],
                 token_count=row["token_count"],
                 created_at=row["created_at"],
             )
             for mid, row in rows[:limit]
         ]
-
-    async def set_debug_capture(
-        self, user_id: UUID, session_id: UUID, enabled: bool
-    ) -> GameSession | None:
-        """Turn the opt-in prompt capture on or off.
-
-        Args:
-            user_id: The owner.
-            session_id: Which session.
-            enabled: Whether to capture.
-
-        Returns:
-            The updated session, or ``None`` if it does not exist.
-        """
-        from datetime import timedelta
-
-        row = self._store.sessions.get(session_id)
-        if row is None or row["user_id"] != user_id:
-            return None
-        row["debug_capture"] = enabled
-        # The 48-hour ceiling is applied here rather than trusted to the
-        # caller, so there is no code path that can extend it.
-        row["debug_capture_until"] = utc_now() + timedelta(hours=48) if enabled else None
-        return await self.get_session(user_id, session_id)
 
 
 def new_id() -> UUID:
@@ -731,6 +637,7 @@ def new_id() -> UUID:
     Returns:
         A random UUID version 4. Random rather than sequential, so identifiers
         reveal nothing about how many accounts exist or in what order they were
-        created — both of which a counting identifier would leak.
+        created — both of which a counting identifier would leak, and both of
+        which would let someone enumerate other people's records by guessing.
     """
     return uuid4()

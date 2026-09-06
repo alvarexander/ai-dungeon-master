@@ -227,7 +227,7 @@ It does not crash and it does not show a stack trace.
 
 Every AI call is logged with its token counts, latency and finish reason (never
 its content). In Phase 2 the same data lands in the `gemini_calls` table, and
-[this query](DATABASE_OPERATIONS.md) shows quota pressure by day.
+[this query](DATABASE.md) shows quota pressure by day.
 
 ---
 

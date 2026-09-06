@@ -192,26 +192,6 @@ export class ChatStore {
   }
 
   /**
-   * Turn the opt-in debug capture on or off for this session.
-   *
-   * @param enabled Whether to store prompt content, encrypted, for 48 hours.
-   * @returns Nothing.
-   */
-  async setDebugCapture(enabled: boolean): Promise<void> {
-    const sessionId = this._sessionId();
-    if (!sessionId) {
-      return;
-    }
-    try {
-      await firstValueFrom(
-        this.api.post(`/api/v1/chat/sessions/${sessionId}/debug-capture`, { enabled }),
-      );
-    } catch (error) {
-      this.recordFailure(error);
-    }
-  }
-
-  /**
    * Clear the current error.
    */
   clearError(): void {

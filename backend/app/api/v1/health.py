@@ -58,11 +58,6 @@ async def ready(container: ContainerDep) -> dict[str, Any]:
     settings = container.settings
     warnings: list[str] = []
 
-    if settings.uses_insecure_dev_encryption:
-        warnings.append(
-            "Encryption is using the local development key, which is written down in "
-            "the .env file. Data is encrypted but not protected."
-        )
     if settings.auth_mode == "stub":
         warnings.append(
             "Authentication is stubbed. Session tokens are not verified and requests "
@@ -76,7 +71,6 @@ async def ready(container: ContainerDep) -> dict[str, Any]:
     return {
         "status": "ready",
         "app_env": settings.app_env,
-        "encryption_provider": settings.encryption_provider,
         "repository_backend": settings.repository_backend,
         "auth_mode": settings.auth_mode,
         "model_id": settings.gemini_model_id,

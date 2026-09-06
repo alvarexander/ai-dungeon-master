@@ -55,11 +55,9 @@ export interface Acknowledgement {
 export interface UserProfile {
   /** Opaque random identifier. Safe to log and to put in a bug report. */
   user_id: string;
-  /** Plaintext by classification — explicitly not personal data here. */
   username: string;
-  /** Plaintext by classification. */
   display_name: string;
-  /** PERSONAL DATA. Encrypted at rest; decrypted only for this response. Never log it. */
+  /** Personal data. Never log it and never put it in a URL. */
   email: string;
   email_verified: boolean;
   created_at: string;
@@ -70,14 +68,14 @@ export interface UserProfile {
 export interface RegisterRequest {
   username: string;
   display_name: string;
-  /** PERSONAL DATA. */
+  /** Personal data. */
   email: string;
   /** Never logged, never stored in the browser, never put in a URL. */
   password: string;
 }
 
 export interface LoginRequest {
-  /** PERSONAL DATA when it is an email address. */
+  /** An email address or a username. */
   identifier: string;
   password: string;
 }
@@ -99,7 +97,6 @@ export type InputMode = 'typed' | 'voice';
 export type MessageRole = 'player' | 'dungeon_master' | 'system';
 
 export interface ChatTurnRequest {
-  /** PERSONAL DATA. Players type real names into this. */
   message: string;
   session_id?: string | null;
   campaign_id?: string | null;
@@ -117,7 +114,6 @@ export interface TokenUsage {
 export interface ChatTurnResponse {
   session_id: string;
   message_id: string;
-  /** PERSONAL DATA — it quotes back what the player said. */
   reply: string;
   turn: number;
   usage: TokenUsage;
@@ -129,7 +125,6 @@ export interface TranscriptMessage {
   message_id: string;
   seq: number;
   role: MessageRole;
-  /** PERSONAL DATA. */
   content: string;
   input_mode: InputMode;
   created_at: string;
@@ -144,7 +139,6 @@ export type Tone = 'heroic' | 'gritty' | 'comedic' | 'horror' | 'mystery';
 
 export interface CampaignSummary {
   campaign_id: string;
-  /** PERSONAL DATA — free text the player wrote. Encrypted at rest. */
   title: string;
   ruleset: Ruleset;
   tone: Tone;
@@ -154,7 +148,6 @@ export interface CampaignSummary {
 }
 
 export interface CampaignDetail extends CampaignSummary {
-  /** PERSONAL DATA. */
   premise: string | null;
   created_at: string;
 }
@@ -186,7 +179,6 @@ export interface AbilityScores {
 export interface CharacterDetail {
   character_id: string;
   campaign_id: string;
-  /** PERSONAL DATA — players use their own or a friend's real name here. */
   name: string;
   character_class: CharacterClass;
   level: number;
@@ -194,7 +186,6 @@ export interface CharacterDetail {
   abilities: AbilityScores;
   hit_points_current: number;
   hit_points_max: number;
-  /** PERSONAL DATA. */
   backstory: string | null;
   created_at: string;
   updated_at: string;
@@ -241,7 +232,7 @@ export interface ActivityEntry {
 
 export interface AccountDeletionResponse {
   user_id: string;
-  shredded_at: string;
+  deleted_at: string;
   detail: string;
 }
 
@@ -250,7 +241,6 @@ export interface AccountDeletionResponse {
 // ---------------------------------------------------------------------------
 
 export interface TranscriptionResponse {
-  /** PERSONAL DATA. Never logged. */
   transcript: string;
   duration_seconds: number;
   language: string;
@@ -263,7 +253,6 @@ export interface TranscriptionResponse {
 export interface ReadinessReport {
   status: string;
   app_env: string;
-  encryption_provider: string;
   repository_backend: string;
   auth_mode: string;
   model_id: string;

@@ -6,9 +6,8 @@
 > **You may not need this document at all.** It exists because a backend on
 > Fly.io cannot reach a database inside an AWS private network. If you put the
 > database on [Hostinger](DEPLOY_MYSQL_HOSTINGER.md) instead, that problem does
-> not arise — you whitelist one IP in hPanel and you are finished. You will
-> still need [the KMS half](DEPLOY_CROSS_CUTTING.md) of the cross-cloud story,
-> because the encryption keys stay in AWS regardless.
+> not arise — you whitelist one IP in hPanel and you are finished, and you do
+> not need an AWS account at all.
 **This is the hardest part of the whole deployment**, and the part where a
 wrong choice is most expensive to undo, so it gets its own document.
 
@@ -283,5 +282,5 @@ distracted. Put a monthly reminder in your calendar to look at that rule.
 
 - [RDS setup](DEPLOY_MYSQL_RDS.md) — creating the database.
 - [Fly.io deployment](DEPLOY_PYTHON_FLYIO.md) — the backend.
-- [Cross-cutting concerns](DEPLOY_CROSS_CUTTING.md) — the *other* cross-cloud
-  problem: how the application authenticates to AWS KMS without a stored key.
+- [Cross-cutting concerns](DEPLOY_CROSS_CUTTING.md) — CORS, secrets, TLS and
+  rollback.

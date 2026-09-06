@@ -160,23 +160,6 @@
           &#128274; personal details removed before sending
         </span>
       }
-      <span class="spacer"></span>
-      <label class="debug-toggle small">
-        <input
-          type="checkbox"
-          [checked]="debugCapture()"
-          (change)="toggleDebugCapture($any($event.target).checked)"
-        />
-        Help us debug this session
-      </label>
     </div>
-    @if (debugCapture()) {
-      <p class="small muted meta__explain">
-        While this is on, the exact text sent to and from the AI is stored — encrypted with
-        your own key — for 48 hours, then deleted automatically. It can only be read through
-        a support process that records who looked and why, and tells you about it in
-        <a routerLink="/account">your account activity</a>.
-      </p>
-    }
   }
 </div>

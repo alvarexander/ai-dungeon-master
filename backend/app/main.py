@@ -50,9 +50,6 @@ from app.core.errors import (
 )
 from app.core.logging import configure_logging, get_logger
 from app.core.ratelimit import InMemoryRateLimiter
-from app.core.security.blind_index import BlindIndexService
-from app.core.security.crypto import EncryptionService
-from app.core.security.keys import build_key_provider
 from app.middleware.correlation import CORRELATION_HEADER, CorrelationMiddleware
 from app.middleware.security_headers import SecurityHeadersMiddleware
 from app.middleware.xsrf import XsrfMiddleware
@@ -117,14 +114,29 @@ def build_container(settings: Settings) -> Container:
     Returns:
         The assembled container.
     """
-    store = MemoryStore()
-    encryption = EncryptionService(build_key_provider(settings))
-    blind_index = BlindIndexService.from_settings(settings)
+    # Which storage to use is a single configuration choice. Both sets of
+    # repositories satisfy the same interfaces in repositories/base.py, so
+    # nothing below this point knows or cares which one it got.
+    if settings.repository_backend == "mysql":
+        from app.repositories.sql import (
+            SqlCampaignRepository,
+            SqlCharacterRepository,
+            SqlSessionRepository,
+            SqlStore,
+            SqlUserRepository,
+        )
 
-    users = MemoryUserRepository(store, encryption, blind_index)
-    campaigns = MemoryCampaignRepository(store, users)
-    characters = MemoryCharacterRepository(store, users)
-    sessions = MemorySessionRepository(store, users)
+        store: Any = SqlStore(settings)
+        users: Any = SqlUserRepository(store)
+        campaigns: Any = SqlCampaignRepository(store)
+        characters: Any = SqlCharacterRepository(store)
+        sessions: Any = SqlSessionRepository(store)
+    else:
+        store = MemoryStore()
+        users = MemoryUserRepository(store)
+        campaigns = MemoryCampaignRepository(store)
+        characters = MemoryCharacterRepository(store)
+        sessions = MemorySessionRepository(store)
 
     analytics = AnalyticsService()
     gemini = GeminiClient(settings)
@@ -143,8 +155,6 @@ def build_container(settings: Settings) -> Container:
     return Container(
         settings=settings,
         store=store,
-        encryption=encryption,
-        blind_index=blind_index,
         limiter=InMemoryRateLimiter(),
         users=users,
         campaigns=campaigns,
@@ -169,8 +179,6 @@ def _warn_about_development_settings(settings: Settings) -> None:
         settings: The validated application settings.
     """
     warnings: list[str] = []
-    if settings.uses_insecure_dev_encryption:
-        warnings.append("encryption uses the development key written down in .env")
     if settings.auth_mode == "stub":
         warnings.append("authentication is stubbed and tokens are not verified")
     if settings.repository_backend == "memory":
@@ -217,7 +225,6 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     _log.info(
         "application_started",
         app_env=settings.app_env,
-        encryption_provider=settings.encryption_provider,
         repository_backend=settings.repository_backend,
         model_id=settings.gemini_model_id,
         stt_enabled=settings.stt_enabled,
@@ -227,6 +234,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     yield
 
     await container.gemini.aclose()
+    # Close database connections cleanly, if there are any. Without this the
+    # server can hang for a few seconds on shutdown waiting for the pool.
+    closer = getattr(container.store, "close", None)
+    if closer is not None:
+        await closer()
     _log.info("application_stopped")
 
 

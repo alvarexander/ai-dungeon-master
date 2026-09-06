@@ -234,4 +234,4 @@ Free tier is 12 months from account creation, not from instance creation. See
 
 - [The cross-cloud problem](DEPLOY_CROSS_CLOUD.md) — **read before step 1**.
 - [Schema reference](../backend/docs/DATABASE.md).
-- [Queries, procedures, migrations](../backend/docs/DATABASE_OPERATIONS.md).
+- [Queries and migrations](../backend/docs/DATABASE.md).

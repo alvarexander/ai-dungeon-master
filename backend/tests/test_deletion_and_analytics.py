@@ -32,38 +32,35 @@ def _register(client, xsrf, username: str) -> dict:
     ).json()
 
 
-def test_deleting_an_account_makes_its_data_unreadable(client, xsrf):
-    """Crypto-shredding, demonstrated end to end.
+def test_deleting_an_account_removes_everything_it_owned(client, xsrf):
+    """Deletion cascades: the account and all its content go together.
 
-    The account writes an encrypted campaign, then deletes itself. Afterwards
-    the ciphertext is still sitting in storage — and is permanently unreadable,
-    because the only key that could open it no longer exists.
+    The account writes a campaign, then deletes itself. Afterwards there is no
+    user row and no campaign row — nothing is left behind for a later cleanup
+    job to forget about.
     """
-    profile = _register(client, xsrf, "shredme")
+    profile = _register(client, xsrf, "deleteme")
     auth = {**xsrf, "Authorization": f"Bearer stub.{profile['user_id']}"}
+    user_id = uuid.UUID(profile["user_id"])
 
     client.post("/api/v1/campaigns", json={"title": "A Secret Story"}, headers=auth)
+    store = client.app.state.container.store
+    assert any(row["user_id"] == user_id for row in store.campaigns.values())
 
     response = client.post(
         "/api/v1/account/delete",
-        json={"confirm_username": "shredme", "understood": True},
+        json={"confirm_username": "deleteme", "understood": True},
         headers=auth,
     )
     assert response.status_code == 200
-    assert response.json()["shredded_at"]
+    assert response.json()["deleted_at"]
 
-    # The ciphertext survives — deletion did not go through the data.
-    store = client.app.state.container.store
-    assert any(row["title_ct"] for row in store.campaigns.values())
-
-    # But the key is gone, so nothing can read it.
-    user_row = store.users[uuid.UUID(profile["user_id"])]
-    assert user_row["dek"] is None
-    assert user_row["status"] == "shredded"
+    assert user_id not in store.users
+    assert not any(row["user_id"] == user_id for row in store.campaigns.values())
 
 
 def test_a_deleted_account_can_no_longer_be_used(client, xsrf):
-    """The session stops working the moment the key is destroyed."""
+    """The session stops working the moment the account is gone."""
     profile = _register(client, xsrf, "goneaway")
     auth = {**xsrf, "Authorization": f"Bearer stub.{profile['user_id']}"}
 
@@ -132,36 +129,34 @@ def test_analytics_rejects_an_undeclared_feature_or_category():
         service.record(uuid.uuid4(), "error_occurred", error_category="user_said_something_odd")
 
 
-def test_analytics_uses_a_pseudonym_not_the_user_id():
-    """The identifier recorded is unrelated to the account identifier."""
+def test_analytics_records_which_account_acted():
+    """Events are attributed to the account, so counts can be per-user."""
     service = AnalyticsService()
     user_id = uuid.uuid4()
 
     service.record(user_id, "turn_taken")
     recorded = service._events[-1]  # noqa: SLF001 - inspecting internals deliberately
 
-    assert recorded.analytics_id != user_id
-    assert service.analytics_id_for(user_id) == recorded.analytics_id
+    assert recorded.user_id == user_id
+    assert recorded.event_name == "turn_taken"
 
 
-def test_severing_the_link_orphans_the_events_but_keeps_the_counts():
-    """Deleting a user leaves anonymous totals rather than deleting history.
+def test_deleting_a_user_removes_their_events_but_keeps_the_totals():
+    """Deletion clears the raw events; the aggregate counters stay correct.
 
-    This is the payoff of the two-plane design: the business metric survives,
-    the person does not.
+    The totals are what the product is measured by, and they should not drop
+    retroactively every time somebody closes their account.
     """
     service = AnalyticsService()
     user_id = uuid.uuid4()
 
     service.record(user_id, "turn_taken")
-    original_pseudonym = service.analytics_id_for(user_id)
     counts_before = service.snapshot()["turn_taken"]
 
-    service.sever(user_id)
+    service.forget(user_id)
 
     assert service.snapshot()["turn_taken"] == counts_before
-    # A new pseudonym is minted; the old events can never be reattached.
-    assert service.analytics_id_for(user_id) != original_pseudonym
+    assert not any(e.user_id == user_id for e in service._events)  # noqa: SLF001
 
 
 def test_durations_are_bucketed_not_exact():

@@ -32,20 +32,18 @@ def test_the_conversation_is_stored_and_can_be_read_back(client, xsrf):
     assert messages[1]["role"] == "dungeon_master"
 
 
-def test_the_transcript_is_ciphertext_in_storage(client, xsrf):
-    """What is actually stored bears no resemblance to what was typed.
+def test_the_transcript_is_stored_against_the_right_owner(client, xsrf):
+    """Every stored message records who it belongs to.
 
-    Reaches into the store deliberately. This is the test that proves the
-    encryption is real rather than a comment claiming it is.
+    That ownership stamp is what the read path checks, and it is the only thing
+    stopping one account reading another's conversation.
     """
-    secret_line = "I whisper the password swordfish to the guard."
-    client.post("/api/v1/chat/turn", json={"message": secret_line}, headers=xsrf)
+    client.post("/api/v1/chat/turn", json={"message": "I look around."}, headers=xsrf)
 
     store = client.app.state.container.store
-    stored_blobs = b"".join(row["content_ct"] for row in store.messages.values())
-
-    assert b"swordfish" not in stored_blobs
-    assert b"whisper" not in stored_blobs
+    assert store.messages
+    owners = {row["user_id"] for row in store.messages.values()}
+    assert len(owners) == 1
 
 
 def test_personal_data_is_scrubbed_before_it_reaches_the_model(client, xsrf, fake_gemini):

@@ -188,8 +188,8 @@ on an action nobody, including us, can reverse:
 </label>
 ```
 
-The warning explains crypto-shredding in plain language rather than saying
-"this cannot be undone" and hoping.
+The warning says specifically what goes — every campaign, character and
+conversation — rather than saying "this cannot be undone" and hoping.
 
 ---
 

@@ -24,7 +24,6 @@ production with a development encryption key is neither.
 
 from __future__ import annotations
 
-import base64
 import functools
 from typing import Literal
 
@@ -32,8 +31,8 @@ from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 Environment = Literal["local", "staging", "production"]
-EncryptionProvider = Literal["local", "aws_kms"]
 RepositoryBackend = Literal["memory", "mysql"]
+
 
 
 class RateLimitRule:
@@ -125,15 +124,6 @@ class Settings(BaseSettings):
     gemini_max_retries: int = 2
     scrub_outbound_prompts: bool = True
 
-    # --- Encryption --------------------------------------------------
-    encryption_provider: EncryptionProvider = "local"
-    local_dev_master_key: SecretStr
-    kms_key_arn: str = ""
-    kms_audit_key_arn: str = ""
-    aws_region: str = "eu-west-2"
-    blind_index_key: SecretStr
-    ip_hash_secret: SecretStr
-
     # --- Authentication ----------------------------------------------
     # "stub"  — Phase 1. Registration and password checking are real, but
     #           sessions are placeholder tokens that grant access to whoever
@@ -163,7 +153,7 @@ class Settings(BaseSettings):
     rate_limit_register: str = "3/3600"
     rate_limit_chat: str = "20/60"
     rate_limit_stt: str = "10/60"
-    rate_limit_password_reset: str = "3/3600"
+    rate_limit_password_reset: str = "3/3600"  # noqa: S105 - a rate limit, not a password
 
     # --- Speech to text ----------------------------------------------
     stt_enabled: bool = True
@@ -216,40 +206,6 @@ class Settings(BaseSettings):
             )
         return value
 
-    @field_validator("local_dev_master_key", "blind_index_key", "ip_hash_secret")
-    @classmethod
-    def _must_be_base64(cls, value: SecretStr) -> SecretStr:
-        """Confirm a secret is valid base64 and long enough to be a real key.
-
-        Base64 is a way of writing raw bytes using ordinary letters and digits
-        so they survive being pasted into a text file. A key that fails to
-        decode would otherwise cause a confusing error deep inside the
-        encryption code, long after startup.
-
-        Args:
-            value: The secret as read from the environment.
-
-        Returns:
-            The value unchanged, if acceptable.
-
-        Raises:
-            ValueError: If the value is not base64, or decodes to fewer than
-                16 bytes, which is too short to be a serious key.
-        """
-        try:
-            decoded = base64.b64decode(value.get_secret_value(), validate=True)
-        except Exception as exc:  # noqa: BLE001 - any decode failure is fatal
-            raise ValueError(
-                "Secret is not valid base64. Generate one with: "
-                'python3 -c "import os,base64; print(base64.b64encode(os.urandom(32)).decode())"'
-            ) from exc
-        if len(decoded) < 16:
-            raise ValueError(
-                f"Secret decodes to only {len(decoded)} bytes; at least 16 are required. "
-                "Generate a 32-byte key instead."
-            )
-        return value
-
     @model_validator(mode="after")
     def validate_production_safety(self) -> Settings:
         """Refuse to start in production with any development shortcut enabled.
@@ -271,13 +227,6 @@ class Settings(BaseSettings):
 
         problems: list[str] = []
 
-        if self.encryption_provider != "aws_kms":
-            problems.append(
-                "ENCRYPTION_PROVIDER is 'local', which uses a key written down in a file. "
-                "Production must use 'aws_kms'."
-            )
-        if not self.kms_key_arn:
-            problems.append("KMS_KEY_ARN is empty but is required when using AWS KMS.")
         if self.auth_mode != "real":
             problems.append(
                 "AUTH_MODE is 'stub', which accepts any placeholder token as proof of "
@@ -336,15 +285,6 @@ class Settings(BaseSettings):
     def is_local(self) -> bool:
         """Return True when running on a developer's machine."""
         return self.app_env == "local"
-
-    @property
-    def uses_insecure_dev_encryption(self) -> bool:
-        """Return True when encryption uses the written-down development key.
-
-        Used to emit a loud startup warning. Data really is encrypted in this
-        mode, but with a key anyone can read, so it protects nothing.
-        """
-        return self.encryption_provider == "local"
 
     @functools.cached_property
     def rate_limits(self) -> dict[str, RateLimitRule]:

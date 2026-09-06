@@ -30,13 +30,16 @@ from uuid import UUID
 
 from app.core.errors import NotFoundError
 from app.core.logging import get_logger
-from app.repositories.base import Campaign, GameSession, Message, User
-from app.repositories.memory import (
-    MemoryCampaignRepository,
-    MemoryCharacterRepository,
-    MemorySessionRepository,
-    new_id,
+from app.repositories.base import (
+    Campaign,
+    CampaignRepository,
+    CharacterRepository,
+    GameSession,
+    Message,
+    SessionRepository,
+    User,
 )
+from app.repositories.memory import new_id
 from app.services.analytics import AnalyticsService
 from app.services.dungeon_master import (
     HISTORY_WINDOW,
@@ -87,9 +90,9 @@ class GameService:
     def __init__(
         self,
         *,
-        campaigns: MemoryCampaignRepository,
-        characters: MemoryCharacterRepository,
-        sessions: MemorySessionRepository,
+        campaigns: CampaignRepository,
+        characters: CharacterRepository,
+        sessions: SessionRepository,
         gemini: GeminiClient,
         analytics: AnalyticsService,
         scrub_outbound: bool,

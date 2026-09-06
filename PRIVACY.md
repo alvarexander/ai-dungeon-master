@@ -1,268 +1,208 @@
-# Privacy
+# Security and Data Handling
 
-**Read this when** you need the whole privacy picture in one place: what is
-being defended against, how every field is classified, what a breach would
-actually expose, who holds which keys, and what the design costs to operate.
+**Read this when** you need to know how user data is protected, what a breach
+would expose, and what is sent to third parties. It is the document to reread
+before adding any feature that touches user data.
 
-This is the document to reread before adding any feature that touches user
-data.
-
----
-
-## The threat model
-
-**The adversary:** someone with full read access to the MySQL database. A
-leaked RDS snapshot, a stolen backup, a compromised read replica, a rogue
-database administrator, or you on a bad day.
-
-**The requirement:** that adversary learns nothing about who the users are.
-
-**The rule, stated as plainly as it can be:** in a database dump, the only
-human-meaningful plaintext is the username. Everything else identifying is
-ciphertext or an irreversible digest.
-
-### What is explicitly outside the boundary
-
-Two things, stated here rather than implied, because a security claim with
-unstated exceptions is not a claim:
-
-- **The running application server**, which necessarily holds keys while it is
-  working.
-- **The AWS KMS keys it can call.**
-
-Compromising the database *and* a live server is a different and much harder
-attack. This design does not defend against it, and does not pretend to.
-
-Also outside: anything already sent to Google Gemini. Once a prompt leaves, it
-is subject to Google's terms rather than ours. See "Third-party data flow".
+> **This describes a deliberately conventional security posture**, chosen so
+> that one person new to application development can run it without a
+> specialist skill set. An earlier version of this project used per-user
+> encryption keys managed by AWS KMS. That was removed on purpose — it was more
+> machinery than this application warrants, and a lost key would have meant
+> permanently unreadable data. What is here now is what a well-built ordinary
+> web application does.
 
 ---
 
-## What counts as personal data here
+## What is protected, and how
 
-**Personal data:** email, phone number, first name, last name, date of birth,
-IP address, payment details, and **any free text a user typed**.
+| Data | How it is protected |
+|---|---|
+| **Passwords** | Hashed with Argon2id. Never stored, never recoverable, by anyone |
+| Email addresses, names | Database access control, TLS in transit, provider disk encryption |
+| Campaigns, characters, transcripts | The same |
+| Session tokens | Phase 2 stores only a hash, so a leak does not hand over working sessions |
+| Everything in transit | TLS between browser and server, and between server and database |
 
-That last clause is the one that surprises people, and it is doing most of the
-work. Campaign titles, character names, backstories and every message in every
-conversation are personal data — because players type their own names, their
-friends' names, where they live, and what happened at work into free text.
-
-**Not personal data, by explicit decision:** username and display name. These
-are stored readable, and the interface says so at the point of entry so that
-someone choosing a handle knows it will be visible.
-
----
-
-## Data classification
-
-Every column in the schema is exactly one of four things, declared in a SQL
-`COMMENT` so the classification lives in the database and cannot drift from the
-documentation.
-
-| Class | Meaning | Readable from a dump? | Searchable? |
-|---|---|---|---|
-| **PLAINTEXT** | As written | Yes | Yes |
-| **ENCRYPTED** | AES-256-GCM under a per-user key | No | No |
-| **HASHED** | One-way digest | No | Only by comparing a guess |
-| **BLIND-INDEX** | Keyed one-way fingerprint, stable | No | Yes, exact matches |
-
-The full per-column table is in
-[backend/docs/DATABASE.md](backend/docs/DATABASE.md). A summary of where the
-line falls:
-
-| Data | Class | Why |
-|---|---|---|
-| Username, display name | PLAINTEXT | Explicitly non-personal here |
-| Identifiers, timestamps, counters | PLAINTEXT | Opaque or non-identifying |
-| Character class, level, campaign tone | PLAINTEXT | Fixed values; identify nobody. Keeping them readable means aggregate questions need no decryption |
-| Email | ENCRYPTED **and** BLIND-INDEX | Encrypted for storage; fingerprinted so login can find it |
-| Phone, names, date of birth | ENCRYPTED | Directly identifying |
-| Campaign titles, premises | ENCRYPTED | User free text |
-| Character names, backstories, sheets | ENCRYPTED | User free text |
-| **Every message in every transcript** | ENCRYPTED | User free text |
-| Password | HASHED (Argon2id) | Must never be readable by anyone |
-| Refresh tokens | HASHED | A leak must not hand over working sessions |
-| IP addresses | HASHED, daily salt | Personal data; only ever needed as a counting key |
-| Support access reasons | ENCRYPTED under a **separate audit key** | So shredding a user does not erase the record of who read their data |
+**The one that is genuinely different is the password.** It is stored as a
+one-way fingerprint. There is no query, no tool and no amount of time that
+turns it back — not for an attacker, and not for you. Everything else is
+protected by controlling *who can reach the data*, not by scrambling it.
 
 ---
 
-## Breach exposure inventory
+## What a database breach would expose
 
-If the entire database were published tomorrow, this is exactly what would be
-in it.
+Being straightforward, because a security document that overstates its
+protection is worse than none:
 
-### Readable
+**Readable to anyone who obtains the database:** email addresses, usernames,
+display names, campaign titles and premises, character names and backstories,
+and every message in every conversation.
 
-- **Usernames and display names.** If someone chose their real name as a
-  display name, that is their disclosure — made with the interface telling them
-  it would be visible.
-- **How many accounts exist and when each was created.**
-- **Activity shape:** how many campaigns, how many messages, how long each
-  message was, whether it was typed or spoken, which character class, which
-  campaign tone, which ruleset.
-- **That two accounts share an email address** — from equal blind index values —
-  without learning what the address is.
+**Not readable:** passwords. Those are Argon2id digests, and Argon2id is
+deliberately slow and memory-hungry precisely so that a stolen database cannot
+be cracked at speed.
 
-### Not readable, at all
+**What follows from that.** The database credentials are the thing that matters
+most. Treat them like a password to your own email:
 
-Email, phone, first name, last name, date of birth, IP addresses, campaign
-titles, campaign premises, character names, backstories, character sheets, and
-every word of every conversation.
-
-There is no computational attack on these. The keys are not in the database and
-are not derivable from anything in it.
-
-### What an attacker could still do
-
-Being honest about the residual risks:
-
-- **Correlate activity within the dump.** They can see that one account played
-  a great deal in August. They cannot tell whose account it is.
-- **Test guessed email addresses — but only if they also stole the blind index
-  key**, which lives in a different system entirely. This is why that key's
-  separation is the whole defence.
-- **Try the live application.** The login endpoint is the remaining enumeration
-  surface, which is why it returns identical responses either way and is rate
-  limited to five attempts per fifteen minutes.
+- Never commit them. `.env` is in `.gitignore`; check `git status` before
+  committing if you are unsure.
+- In production they go in `fly secrets set`, never in a config file.
+- The database is reachable only from the backend's address, never from the
+  open internet.
+- The application connects as a user with rights to one database and no
+  ability to `DROP` or `ALTER` anything.
 
 ---
 
-## Key custody
+## Passwords, in detail
 
-| Key | Purpose | Lives | In the database? |
-|---|---|---|---|
-| KMS master key | Wraps every per-user key | AWS KMS hardware | **Never** |
-| Per-user data key | Encrypts one user's data | Wrapped, in their row | Only wrapped |
-| Blind index key | Fingerprints emails | AWS Secrets Manager | **Never** |
-| IP salt | Fingerprints addresses; rotates daily | Derived in memory | **Never** |
-| Audit key | Encrypts support access reasons | A separate KMS key | **Never** |
+**Argon2id**, via `argon2-cffi`, with `time_cost=3`, `memory_cost=65536`
+(64 MB), `parallelism=2`.
 
-### Your administrator role cannot read user data
+### Hashing is not encryption, and the difference matters
 
-The KMS key policy grants `Decrypt` on the user data key to the **application
-role only**. Your everyday IAM administrator role is explicitly denied it.
+This is the distinction newcomers most often get wrong, and getting it wrong is
+a serious defect rather than a style choice.
 
-This is deliberate and it is inconvenient on purpose. It means that if your own
-AWS credentials are phished, the attacker gets your infrastructure but not your
-users' data.
+- **Encryption is a round trip.** You encrypt, and later you decrypt back to the
+  original. It is for data you need to read again.
+- **Hashing is one way.** There is no way back. You can only hash a guess and
+  see whether the two match.
 
-### Break-glass
+Passwords are hashed. If they were encrypted, anyone who obtained the key would
+recover every password in plaintext — and because people reuse passwords, you
+would have handed the attacker their email and bank logins too.
 
-A separate role that *can* decrypt, for a genuine emergency:
+### Why Argon2id rather than something faster
 
-1. Assuming it requires multi-factor authentication and a stated reason.
-2. Every use fires a CloudTrail alert immediately.
-3. Every use is reviewed afterwards.
-4. The grant is time-boxed.
+A fast hash is a liability. An attacker with a stolen database tries billions of
+guesses per second on specialised hardware. Argon2id is deliberately slow *and*
+memory-hungry, and the memory requirement is what defeats that hardware: you can
+fit thousands of tiny fast circuits on a chip, but not thousands of copies of
+64 megabytes.
 
-**It should be used approximately never.** If you find yourself reaching for it
-routinely, the debugging workflow below is not working and that is the thing to
-fix.
+**That 64 MB is charged per concurrent login**, so it interacts directly with
+the memory size of the server. Worth remembering before raising it.
 
-### What you do instead of reading the table
+### Two supporting measures
 
-This makes production debugging genuinely harder, and here is the workflow that
-replaces it:
-
-1. **Ask for the correlation identifier.** Every error screen shows one. It
-   finds every log line for that request.
-2. **Read the metrics.** Latency, token counts, finish reasons, error codes and
-   retry counts are all recorded, and answer most questions on their own.
-3. **Ask the user to switch on debug capture** and reproduce. Their prompt and
-   the reply are stored, encrypted under their own key, for 48 hours.
-4. **Only then, an audited support grant** — which the user is told about.
-
-A worked example is in
-[backend/docs/OBSERVABILITY.md](backend/docs/OBSERVABILITY.md).
+- **`verify_dummy`** spends the same time when no account matches. Without it,
+  an unknown email returns in a millisecond and a known one in 300 — and an
+  attacker enumerates your users with a stopwatch.
+- **`needs_rehash`** quietly upgrades old hashes at the next sign-in as the
+  recommended parameters rise, with no password reset and no announcement.
 
 ---
 
-## Retention and deletion
+## The other protections
 
-| Data | Kept for | Then |
-|---|---|---|
-| Account and campaigns | Until deleted | Crypto-shredded |
-| Debug telemetry (logs) | 14 days | Hard deleted |
-| Raw analytics events | 90 days | Hard deleted |
-| Aggregate counters | Indefinitely | Never identify anyone |
-| Opt-in debug captures | 48 hours maximum | Hard deleted |
-| Support access audit | Indefinitely | Append-only |
+Each of these is standard, and each closes a real category of attack. Full
+implementation detail is in
+[backend/docs/SECURITY.md](backend/docs/SECURITY.md).
 
-### Crypto-shredding
-
-Deleting an account **destroys the encryption key** rather than the data.
-
-It sounds like sleight of hand, so here is the mechanism. Every piece of that
-user's data is encrypted with their key, and their key exists in exactly one
-place: the wrapped copy in their row. Delete those bytes and the ciphertext
-everywhere else — live tables, last night's snapshot, the backup from March, a
-copy an attacker exfiltrated last week — becomes permanently unreadable.
-
-Not hidden. Not flagged deleted. Mathematically unrecoverable, by us and by
-anyone else, forever.
-
-This is why the design uses a key per user rather than one key for everything,
-and it is the single most valuable property of that choice. It is also the only
-honest way to answer "delete my data" when backups exist that nobody can edit.
-
-The account-deletion endpoint destroys the key, severs the analytics link, and
-leaves the ciphertext to be cleaned up lazily.
+| Protection | Stops |
+|---|---|
+| **XSRF tokens** | A malicious page making requests as you, using your logged-in session |
+| **SSRF allowlist** | Somebody tricking the server into fetching an internal address, such as a cloud credential service |
+| **Rate limiting** | Password guessing, account enumeration, and burning the AI quota |
+| **Input validation** | Malformed and oversized data reaching application code at all |
+| **Security headers** | Clickjacking, content-type confusion, and referrer leakage |
+| **TLS everywhere** | Anyone on the network path reading or altering traffic |
+| **Ownership checks on every query** | One account reading another's campaigns by guessing an identifier |
+| **Random UUID identifiers** | Guessing the next record by counting up from one |
+| **Log redaction** | Passwords and tokens ending up in log files |
 
 ---
 
-## Observability without surveillance
+## What is recorded, and what is not
 
-Two planes that never join:
+### Logs
 
-**Analytics.** Pseudonymous, aggregate, long retention. Every user has a random
-`analytics_id` unrelated to their account, linked only through one encrypted
-mapping row. **The analytics schema has no free-text column anywhere**, so
-nothing a user typed can reach it — not by accident, not by a careless change.
-Geography is country only, taken from an edge header so no address is ever
-inspected. Durations are bucketed so an exact value cannot act as a
-fingerprint.
+Structured JSON, with credential-shaped fields replaced by `<redacted>`.
+**Request bodies are never logged.** The rule the codebase follows is *log
+identifiers, not contents*: a `user_id` tells you which account without putting
+anybody's words in a file that gets copied around.
 
-**Debug telemetry.** Per-request, 14 days. Every request has a correlation
-identifier stamped on every log line and returned to the browser. Logs use an
-**allowlist**: a field not explicitly declared safe is replaced with a
-description of its type and length. A blocklist would protect only against the
-leaks somebody already thought of.
+Every request carries a **correlation identifier**, returned to the browser and
+stamped on every log line for that request. When somebody reports a problem you
+ask for it and search the logs — that is the intended debugging workflow, and
+it is usually faster than reading database rows anyway.
 
-Full detail in
-[backend/docs/OBSERVABILITY.md](backend/docs/OBSERVABILITY.md).
+### Analytics
+
+Counts and categories only: sessions started, turns taken, voice versus typing,
+error categories, country.
+
+**There is no free-text column anywhere in the analytics table.** Not a
+convention — there is physically nowhere for a message to land, so a careless
+change later cannot start recording what players typed. Unknown event names are
+rejected at write time rather than silently accepted.
+
+Country comes from the edge network's `CF-IPCountry` header, so the server
+never inspects or stores an IP address to work out geography.
 
 ---
 
-## Third-party data flow
+## Third-party data flow: Google Gemini
 
-**Every prompt sent to Gemini leaves your infrastructure.** This is the one
-place personal data leaves your control by design.
+**This is the one place user data genuinely leaves your control**, and the part
+of this document most worth reading.
 
-**Google's free tier terms are explicit:** content submitted to the unpaid
-service is used to provide, improve and develop Google's products, and human
-reviewers may read, annotate and process it. Google says it disconnects that
-content from your account first, and advises not to submit sensitive,
-confidential or personal information.
+Every prompt sent to Gemini goes to Google. **Google's free-tier terms are
+explicit**: content submitted to the unpaid service is used to provide, improve
+and develop Google's products, and human reviewers may read, annotate and
+process it. Google says it disconnects that content from your account first,
+and advises against submitting sensitive or personal information.
 
 **On the paid tier this changes entirely** — Google states it does not use paid
 prompts or responses to improve its products.
 
-Three responses, and only the third is complete:
+Two responses, and only the second is complete:
 
-1. **Outbound scrubbing.** Emails, phone numbers, card numbers, postcodes,
-   links and dates of birth are replaced before sending. **What it cannot catch
-   is a name in an ordinary sentence** — "my sister Emma is coming over" is
-   indistinguishable from naming a character. An earlier version that stripped
-   all capitalised words made the Dungeon Master incoherent, and a privacy
-   control that ruins the product gets switched off.
-2. **In-app disclosure.** The "Your data" screen tells users plainly, before
-   they type, that their words go to Google and what Google may do with them.
-3. **Enable billing.** The complete fix. At this application's traffic it costs
-   pennies a month. **If real people other than you will use this, do it.**
+1. **In-app disclosure.** The "Your data" screen tells users plainly, before
+   they type, where their words go and what Google may do with them. People
+   cannot make a sensible choice about what to type if they do not know.
+2. **Enable billing.** The complete fix, and at this application's traffic it
+   costs a few pounds a month. **If real people other than you will use this,
+   do it.** See [backend/docs/GEMINI.md](backend/docs/GEMINI.md).
 
-**Audio is different and never goes to Google.** See ADR-008.
+There is also an outbound scrubber that removes email addresses, phone numbers,
+card numbers and postcodes from prompts before they are sent
+(`SCRUB_OUTBOUND_PROMPTS=true`). It is a reduction, not a guarantee: it cannot
+catch a name in an ordinary sentence, because "my sister Emma is coming over"
+is indistinguishable from naming a character.
+
+### Voice is different, and does not go to Google
+
+Browsers have built-in speech recognition, and in Chrome it works by streaming
+raw microphone audio to Google. This application does not use it. Recordings go
+to our own server, are transcribed by a model running there, and are discarded.
+
+The reasoning: text can be reviewed and scrubbed before it is sent. A recording
+cannot — it carries the speaker's identity in its waveform whatever the words
+are, plus whatever else was audible in the room.
+
+That choice costs about **$4/month** in extra server memory. See
+[docs/COSTS.md](docs/COSTS.md).
+
+---
+
+## Account deletion
+
+Deleting an account removes it and everything belonging to it — campaigns,
+characters, play sessions and every message — through `ON DELETE CASCADE` in
+the schema. Nothing is left behind for a later cleanup job to forget.
+
+Analytics events survive with their `user_id` set to `NULL`, so the totals stay
+correct while the events become anonymous.
+
+**One honest limitation:** this does not reach into database backups. A backup
+taken before the deletion still contains the rows until it ages out of the
+retention window. That is true of essentially every online service, and it
+should be stated in any privacy policy you write rather than glossed over.
 
 ---
 
@@ -271,53 +211,45 @@ Three responses, and only the third is complete:
 Every one of these is a deliberate, documented acceptance rather than an
 oversight.
 
-1. **A live server compromise defeats this.** The server holds keys while
-   working. Out of scope, and a much harder attack.
-2. **The blind index leaks equality.** Two accounts with the same email are
-   visible as such. The address is not.
-3. **The scrubber cannot catch names.** Structured patterns only.
-4. **Free-tier prompts are used for training.** Fixed by enabling billing.
-5. **Analytics timing correlation.** Someone with the analytics table and
-   external knowledge of when a specific person played could make a probabilistic
-   link. Mitigated by bucketing and by country-only geography.
+1. **Database access means data access.** Anyone who can query the database can
+   read emails and conversations. Access control is the protection.
+2. **Free-tier prompts are used for training.** Fixed by enabling billing.
+3. **The outbound scrubber cannot catch names.** Structured patterns only.
+4. **Backups outlive deletion** until they age out.
+5. **Authentication is not yet real.** Session tokens are placeholders. The
+   backend refuses to start in production while that is true.
 6. **DNS rebinding against the SSRF guard.** Narrow, and mitigated by the
    hostname allowlist.
-7. **Phase 1 has no real authentication.** The application refuses to run this
-   way in production.
 
 ---
 
-## What this design costs
+## If you later want stronger protection
 
-**Things you cannot do:**
+The obvious next step, should this ever hold data you would be seriously
+troubled to lose control of, is encrypting personal columns in the application
+before they are written. That protects against a leaked backup or a
+compromised database host.
 
-- Search transcripts. Not for support, not for moderation, not for analytics.
-- Sort campaigns by title in the database — it happens after decryption, which
-  is why lists are paged.
-- Look up a user by email address in a database client.
-- Read a user's data to debug their problem.
-- Recover anything for a user who deleted their account. Ever.
+**It is not free**, which is why it is not here:
 
-**Things it costs in money and effort:**
+- An encryption key must be generated, stored and backed up. **If it is lost,
+  the data is permanently unreadable and no backup can recover it.**
+- Encrypted columns cannot be searched or sorted by the database, so login
+  needs a separate searchable fingerprint of the email address, and lists have
+  to be sorted after decryption.
+- Key rotation becomes a re-encryption job across every row.
 
-- A KMS call per user per five minutes (cached), and its small AWS bill.
-- Extra memory on the backend for local transcription: about $5/month.
-- Slower development, because every new field requires a classification
-  decision.
-
-**What you get:**
-
-A database breach exposes usernames and timestamps. That is the entire
-incident. No email addresses to sell, no transcripts to publish, no disclosure
-letter describing what was in them, and no lasting exposure for anybody who had
-already deleted their account.
+That is a reasonable trade for a service holding medical or financial records.
+It is a poor one for a Dungeons & Dragons game maintained by one person, where
+the most likely outcome is a lost key and lost data.
 
 ---
 
 ## Related documents
 
-- [ARCHITECTURE.md](ARCHITECTURE.md) — diagrams of the boundary.
-- [docs/DECISIONS_PRIVACY.md](docs/DECISIONS_PRIVACY.md) — why each choice.
-- [backend/docs/SECURITY.md](backend/docs/SECURITY.md) — the implementation.
-- [backend/docs/DATABASE.md](backend/docs/DATABASE.md) — per-column detail.
-- [backend/docs/GEMINI.md](backend/docs/GEMINI.md) — what Google does with prompts.
+- [backend/docs/SECURITY.md](backend/docs/SECURITY.md) — implementation detail.
+- [backend/docs/GEMINI.md](backend/docs/GEMINI.md) — what Google does with
+  prompts.
+- [ARCHITECTURE.md](ARCHITECTURE.md) — how the pieces fit together.
+- [docs/LOCAL_MYSQL.md](docs/LOCAL_MYSQL.md) — see your own data, including
+  what a password hash looks like.

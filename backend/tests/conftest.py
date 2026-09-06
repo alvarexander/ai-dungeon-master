@@ -11,14 +11,13 @@ Two rules govern every test in this suite:
    flaky, would consume the free quota, and would send test content to a third
    party. The Gemini client is replaced with a fake.
 
-Encryption, however, is **not** faked. Tests run the real AES-256-GCM code
-against the local development key, because encryption is the part most worth
-testing and a mock of it would prove nothing.
+Password hashing is **not** faked. Tests run real Argon2id, which makes the
+authentication tests a little slower and means they actually verify the thing
+that matters.
 """
 
 from __future__ import annotations
 
-import base64
 import os
 from collections.abc import Iterator
 from typing import Any
@@ -33,9 +32,6 @@ _TEST_ENV = {
     "CORS_ALLOWED_ORIGINS": "http://localhost:4200",
     "GEMINI_API_KEY": "test-key-not-real",
     "GEMINI_BASE_URL": "https://generativelanguage.googleapis.com",
-    "LOCAL_DEV_MASTER_KEY": base64.b64encode(b"0" * 32).decode(),
-    "BLIND_INDEX_KEY": base64.b64encode(b"1" * 32).decode(),
-    "IP_HASH_SECRET": base64.b64encode(b"2" * 32).decode(),
     "LOG_FORMAT": "console",
     "LOG_LEVEL": "WARNING",
     "AUTH_MODE": "stub",
@@ -58,37 +54,6 @@ def settings() -> Any:
 
     get_settings.cache_clear()
     return get_settings()
-
-
-@pytest.fixture
-def encryption(settings: Any) -> Any:
-    """Return a real encryption service using the development key.
-
-    Args:
-        settings: The application settings.
-
-    Returns:
-        An ``EncryptionService``. Genuinely encrypts — this is not a stub.
-    """
-    from app.core.security.crypto import EncryptionService
-    from app.core.security.keys import build_key_provider
-
-    return EncryptionService(build_key_provider(settings))
-
-
-@pytest.fixture
-def blind_index(settings: Any) -> Any:
-    """Return a real blind index service.
-
-    Args:
-        settings: The application settings.
-
-    Returns:
-        A ``BlindIndexService``.
-    """
-    from app.core.security.blind_index import BlindIndexService
-
-    return BlindIndexService.from_settings(settings)
 
 
 class FakeGemini:

@@ -1,293 +1,242 @@
-# Database — Schema Reference
+# Database
 
-**Read this when** you need to know what tables exist, what each column holds,
-and — most importantly — how each column is protected. For how to *use* the
-database (queries, stored procedures, migrations, permissions), read
-[DATABASE_OPERATIONS.md](DATABASE_OPERATIONS.md) instead.
+**Read this when** you need to know what tables exist, how to query them, or
+how to change the schema.
 
-The authoritative definition is the SQL itself, in
+To run MySQL on your own machine and look at your own data, follow
+[docs/LOCAL_MYSQL.md](../../docs/LOCAL_MYSQL.md). The authoritative schema is
 [`migrations/0001_initial_schema.sql`](../migrations/0001_initial_schema.sql).
-Every column there carries a `COMMENT` declaring its classification, so the
-classification travels with the database and cannot drift away from this
-document. If the two ever disagree, the SQL is right and this file is stale —
-fix it in the same commit.
-
-**Phase 1 note.** None of this is connected yet. The schema is designed in full
-and the migrations are written and runnable, but the application uses an
-in-memory store (see
-[ADR-013](../../docs/DECISIONS_PLATFORM.md)). The encryption code that will
-protect these columns is real and running today.
 
 ---
 
-## The four classifications
+## Two storage backends
 
-Every column in the database is exactly one of these. There is no fifth
-category and no "it depends".
+| `REPOSITORY_BACKEND` | What it is | Data survives restart? |
+|---|---|---|
+| `memory` (default) | Python dictionaries | **No** |
+| `mysql` | A real database | Yes |
 
-| Classification | What it means | Can it be read from a stolen dump? | Can it be searched? |
-|---|---|---|---|
-| **PLAINTEXT** | Stored as written. | Yes | Yes |
-| **ENCRYPTED** | AES-256-GCM ciphertext under a key unique to one user. | No | No |
-| **HASHED** | One-way digest. The original is gone forever. | No | Only by comparing a fresh guess |
-| **BLIND-INDEX** | Keyed one-way fingerprint, stable so it can be indexed. | No | Yes, for exact matches |
+Both satisfy the same interfaces in `app/repositories/base.py`, so nothing
+above that layer knows which one it got. Switching is one line in `.env`.
 
-**PLAINTEXT is only permitted for data that is not personal.** In this product
-that means: opaque random identifiers, usernames, display names, counters,
-timestamps, and values from a fixed enumerated list. Nothing a person typed,
-and nothing that identifies them outside the application.
+The in-memory store is the default so that a newcomer can get the application
+running without installing a database first — that is the point at which people
+give up.
 
 ---
 
-## What a stolen database dump would reveal
+## The tables
 
-This is the honest inventory. An attacker with a complete copy of every table
-learns exactly this and nothing more:
+Seven, plus bookkeeping.
 
-- **Usernames and display names.** Readable. You classified these as
-  non-personal, so they are stored as-is. If a user picks their real name as
-  their display name, that is their disclosure, not the database's.
-- **How many accounts exist, and when each was created.** Timestamps are
-  plaintext.
-- **The shape of activity**: how many campaigns, how many messages, how long
-  each message was, whether it was typed or spoken, which character class was
-  chosen, what tone a campaign uses.
-- **Which accounts share an email address** — from equal blind index values —
-  but not what any address is.
-- **Nothing else.** No email, no name, no phone, no date of birth, no IP
-  address, no message content, no character names, no backstories.
+```
+users
+  └── campaigns            (ON DELETE CASCADE)
+        └── characters     (ON DELETE CASCADE)
+        └── game_sessions  (ON DELETE CASCADE)
+              └── messages (ON DELETE CASCADE)
 
-What the attacker cannot do, even with unlimited time: turn any ciphertext
-column into readable text. The keys are not in the database. They are not
-derivable from anything in the database.
-
----
-
-## Entity relationship diagram
-
-An *entity relationship diagram* shows tables as boxes and the links between
-them as lines. `||--o{` means "one to many": one campaign has many characters.
-
-Column names ending `_ct` hold ciphertext, `_bidx` a blind index, and `_hmac` a
-digest.
-
-```mermaid
-erDiagram
-    users ||--o| user_analytics_map : "maps to (encrypted)"
-    users ||--o{ user_sessions : "has"
-    users ||--o{ account_activity_log : "sees"
-    users ||--o{ campaigns : "owns"
-    users ||--o{ characters : "owns"
-    users ||--o{ game_sessions : "owns"
-    users ||--o{ messages : "owns"
-    users ||--o{ debug_captures : "opted in to"
-    users ||--o{ support_access_grants : "is subject of"
-
-    campaigns ||--o{ characters : "contains"
-    campaigns ||--o{ game_sessions : "is played in"
-    game_sessions ||--o{ messages : "records"
-    game_sessions ||--o{ gemini_calls : "triggers"
-    gemini_calls ||--o| debug_captures : "may capture"
-
-    users {
-        BINARY16 user_id PK "PLAINTEXT opaque uuid"
-        VARCHAR username UK "PLAINTEXT non-personal"
-        VARCHAR display_name "PLAINTEXT non-personal"
-        BINARY32 email_bidx UK "BLIND-INDEX hmac-sha256"
-        VARBINARY email_ct "ENCRYPTED"
-        VARCHAR password_hash "HASHED argon2id"
-        VARBINARY phone_ct "ENCRYPTED"
-        VARBINARY first_name_ct "ENCRYPTED"
-        VARBINARY last_name_ct "ENCRYPTED"
-        VARBINARY date_of_birth_ct "ENCRYPTED"
-        VARBINARY dek_wrapped "ENCRYPTED key - delete to shred"
-        INT dek_key_version "PLAINTEXT rotation marker"
-        ENUM status "PLAINTEXT"
-        DATETIME created_at "PLAINTEXT"
-    }
-
-    user_analytics_map {
-        BINARY16 user_id PK "PLAINTEXT opaque"
-        VARBINARY analytics_id_ct "ENCRYPTED - the only link"
-    }
-
-    campaigns {
-        BINARY16 campaign_id PK "PLAINTEXT opaque"
-        BINARY16 user_id FK "PLAINTEXT opaque"
-        VARBINARY title_ct "ENCRYPTED user free text"
-        VARBINARY premise_ct "ENCRYPTED user free text"
-        ENUM ruleset "PLAINTEXT"
-        ENUM tone "PLAINTEXT"
-        ENUM status "PLAINTEXT"
-    }
-
-    characters {
-        BINARY16 character_id PK "PLAINTEXT opaque"
-        BINARY16 campaign_id FK "PLAINTEXT opaque"
-        VARBINARY name_ct "ENCRYPTED user free text"
-        MEDIUMBLOB backstory_ct "ENCRYPTED user free text"
-        MEDIUMBLOB sheet_ct "ENCRYPTED json"
-        ENUM char_class "PLAINTEXT non-personal"
-        TINYINT char_level "PLAINTEXT non-personal"
-    }
-
-    game_sessions {
-        BINARY16 game_session_id PK "PLAINTEXT opaque"
-        BINARY16 campaign_id FK "PLAINTEXT opaque"
-        DATETIME started_at "PLAINTEXT"
-        INT turn_count "PLAINTEXT counter"
-        TINYINT debug_capture "PLAINTEXT opt-in flag"
-    }
-
-    messages {
-        BINARY16 message_id PK "PLAINTEXT opaque"
-        BINARY16 game_session_id FK "PLAINTEXT opaque"
-        INT seq "PLAINTEXT ordering"
-        ENUM role "PLAINTEXT"
-        MEDIUMBLOB content_ct "ENCRYPTED transcript"
-        ENUM input_mode "PLAINTEXT"
-        INT token_count "PLAINTEXT counter"
-    }
-
-    user_sessions {
-        BINARY16 session_id PK "PLAINTEXT opaque"
-        BINARY32 refresh_token_hash UK "HASHED sha256"
-        BINARY32 ip_hmac "HASHED daily salt"
-        VARBINARY user_agent_ct "ENCRYPTED"
-        DATETIME expires_at "PLAINTEXT"
-    }
-
-    gemini_calls {
-        BINARY16 call_id PK "PLAINTEXT opaque"
-        BINARY16 correlation_id "PLAINTEXT debug handle"
-        VARCHAR model_id "PLAINTEXT"
-        INT latency_ms "PLAINTEXT"
-        INT tokens_in "PLAINTEXT"
-        INT tokens_out "PLAINTEXT"
-        ENUM finish_reason "PLAINTEXT"
-        VARCHAR error_code "PLAINTEXT"
-    }
-
-    debug_captures {
-        BINARY16 capture_id PK "PLAINTEXT opaque"
-        MEDIUMBLOB prompt_ct "ENCRYPTED 48h opt-in"
-        MEDIUMBLOB response_ct "ENCRYPTED 48h opt-in"
-        DATETIME expires_at "PLAINTEXT"
-    }
-
-    support_access_grants {
-        BINARY16 grant_id PK "PLAINTEXT opaque"
-        VARCHAR operator_id "PLAINTEXT staff not customer"
-        BINARY16 target_user_id "PLAINTEXT opaque"
-        VARBINARY reason_ct "ENCRYPTED under audit key"
-        DATETIME expires_at "PLAINTEXT"
-    }
-
-    account_activity_log {
-        BIGINT activity_id PK "PLAINTEXT counter"
-        BINARY16 user_id FK "PLAINTEXT opaque"
-        ENUM event_type "PLAINTEXT"
-        VARBINARY detail_ct "ENCRYPTED"
-    }
+analytics_events           (ON DELETE SET NULL — see below)
+schema_migrations
 ```
 
-The analytics tables are drawn separately below, because the fact that they
-have **no line connecting them to `users`** is the entire point.
+### What each holds
 
-```mermaid
-erDiagram
-    analytics_events {
-        BIGINT event_id PK "PLAINTEXT counter"
-        BINARY16 analytics_id "PLAINTEXT pseudonym - NOT a foreign key"
-        ENUM event_name "PLAINTEXT allowlist"
-        CHAR country_code "PLAINTEXT country only"
-        ENUM duration_bucket "PLAINTEXT bucketed"
-        INT turn_count "PLAINTEXT"
-        ENUM feature "PLAINTEXT"
-        ENUM error_category "PLAINTEXT"
-    }
-    analytics_daily_aggregates {
-        DATE day PK "PLAINTEXT"
-        ENUM metric PK "PLAINTEXT"
-        VARCHAR dimension PK "PLAINTEXT enum-constrained"
-        BIGINT value "PLAINTEXT count"
-    }
-    analytics_retention_cohorts {
-        DATE signup_week PK "PLAINTEXT"
-        TINYINT week_offset PK "PLAINTEXT"
-        INT active_users "PLAINTEXT count"
-    }
-    rate_limit_counters {
-        BINARY32 bucket_hmac PK "HASHED ip or username"
-        ENUM scope PK "PLAINTEXT"
-        DATETIME window_start PK "PLAINTEXT"
-        INT hit_count "PLAINTEXT counter"
-    }
+| Table | Holds | Notes |
+|---|---|---|
+| `users` | Accounts | `password_hash` is Argon2id and is never recoverable |
+| `campaigns` | One ongoing story | Title, premise, tone, ruleset |
+| `characters` | Player characters | The sheet is a JSON column |
+| `game_sessions` | One sitting at the table | Turn count |
+| `messages` | The transcript | `seq` numbers them within a session |
+| `analytics_events` | Usage counts | **No free-text column exists** |
+| `schema_migrations` | Which migrations have run | With a checksum |
+
+### Three schema choices worth understanding
+
+**`BINARY(16)` for identifiers.** A UUID stored as sixteen raw bytes rather
+than a thirty-six character string. Less than half the size, and size matters
+because every index holds a copy. `_to_db` and `_from_db` in `sql.py` convert at
+the boundary, so nothing else has to think about it.
+
+**Identifiers are random, not sequential.** A counting identifier leaks how many
+accounts exist and in what order they were created — and, more importantly,
+lets somebody read other people's records by guessing the next number.
+
+**The character sheet is a JSON column.** Sheets gain fields constantly, and a
+JSON column absorbs that without a migration every time. The two fields actually
+queried — class and level — are real columns.
+
+### Cascades, and the one exception
+
+`ON DELETE CASCADE` means that when a row goes, everything belonging to it goes
+too. Deleting an account removes its campaigns, characters, sessions and
+messages in one statement, and **cannot leave orphans behind** — which a
+hand-written cleanup routine can, the first time somebody adds a table and
+forgets to update it.
+
+`analytics_events` is deliberately different: `ON DELETE SET NULL`. The event
+survives with no owner, so the totals stay correct while the person disappears
+from them. Business metrics should not drop retroactively every time somebody
+closes their account.
+
+### Analytics has no free-text column
+
+Every field is an enumerated value, a number, a boolean or a timestamp. That is
+a mechanism rather than a promise: a careless change later cannot start
+recording what players typed, because there is physically nowhere for it to go.
+
+---
+
+## Querying
+
+Every query lives in `app/repositories/sql.py`, written out in full. You can
+copy one into a database client and run it.
+
+### The rule that is not negotiable
+
+**Named parameters, never string joining:**
+
+```python
+# Right — the driver sends the query and the value separately.
+text("SELECT ... FROM users WHERE email = :email"), {"email": email}
+
+# Wrong. This is SQL injection, and it is the most common serious web
+# vulnerability. Never do this, however certain you are about the input.
+text(f"SELECT ... FROM users WHERE email = '{email}'")
 ```
 
-There is no foreign key from `analytics_events.analytics_id` to any table. That
-absence is deliberate and load-bearing: the database is structurally incapable
-of joining an event back to a person. Only the application, holding a user's
-decryption key, can make that connection — and only for a user who has not been
-deleted.
+### The main access patterns
+
+**Find an account for sign-in:**
+
+```sql
+SELECT user_id, username, display_name, email, email_verified,
+       password_hash, status, created_at
+  FROM users WHERE email = :email LIMIT 1;
+```
+
+**List someone's campaigns:**
+
+```sql
+SELECT campaign_id, user_id, title, premise, ruleset, tone, status,
+       created_at, updated_at
+  FROM campaigns
+ WHERE user_id = :user_id AND status <> 'archived'
+ ORDER BY updated_at DESC LIMIT :limit OFFSET :offset;
+```
+
+Note `user_id` is **in the query**, not checked afterwards. A campaign
+belonging to somebody else simply does not come back. Every read in this
+codebase works that way.
+
+**Read a page of a conversation:**
+
+```sql
+SELECT message_id, seq, role, content, input_mode, token_count, created_at
+  FROM messages
+ WHERE game_session_id = :sid AND user_id = :user_id AND seq > :after
+ ORDER BY seq ASC LIMIT :limit;
+```
+
+**Append a message, safely:**
+
+```sql
+SELECT COALESCE(MAX(seq), 0) + 1 FROM messages
+ WHERE game_session_id = :sid FOR UPDATE;
+```
+
+`FOR UPDATE` locks those rows until the transaction commits. Without it, two
+requests arriving together could both read "the last one was 6" and both try to
+write 7 — and the unique key on `(game_session_id, seq)` would reject one of
+them, losing a message.
+
+**Delete an account** — one statement, cascades do the rest:
+
+```sql
+DELETE FROM users WHERE user_id = :user_id;
+```
+
+**See how the product is doing:**
+
+```sql
+SELECT DATE(occurred_at) AS day, event_name, COUNT(*) AS n
+  FROM analytics_events
+ WHERE occurred_at >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL 30 DAY)
+ GROUP BY day, event_name ORDER BY day DESC;
+```
 
 ---
 
-## Indexes, and why there are so few
+## Migrations
 
-An *index* is a lookup structure that makes searching a column fast. It is also
-a second copy of that column's contents, sitting in a separate file. Indexing an
-encrypted column would be pointless (ciphertext does not sort meaningfully);
-indexing a plaintext personal column would quietly duplicate the very data the
-design is trying to protect.
+### What a migration is, and why you cannot skip one
 
-So the rule is: **no index on personal data except the blind index.**
+The database starts empty. A migration is a numbered file of instructions that
+changes its structure. They run in order, once each, and are **never edited
+after they have run anywhere real.**
 
-| Table | Index | On | Why it is safe |
-|---|---|---|---|
-| `users` | `uq_users_username` | `username` | Plaintext by classification |
-| `users` | `uq_users_email_bidx` | `email_bidx` | Blind index — the one permitted exception |
-| `users` | `idx_users_created_at` | `created_at` | A timestamp |
-| `campaigns` | `idx_campaigns_user` | `user_id, status, updated_at` | Opaque identifier plus enum and timestamp |
-| `messages` | `uq_messages_session_seq` | `game_session_id, seq` | Opaque identifier plus an integer |
-| `user_sessions` | `uq_sessions_token` | `refresh_token_hash` | A hash |
-| `rate_limit_counters` | primary key | `bucket_hmac, scope, window_start` | A digest |
-| `analytics_events` | `idx_ae_analytics` | `analytics_id, occurred_at` | Pseudonym, unlinkable without the encrypted map |
+Skip one and the application expects a column that does not exist, failing on
+the first request that touches it. Edit one that has already run and your
+laptop and the server end up with silently different schemas — considerably
+worse than an error, because nothing tells you.
+
+`scripts/migrate.py` records each file with a checksum and **refuses to
+continue** if an applied file has changed.
+
+### Running them
+
+```bash
+cd backend && uv sync --extra db
+DATABASE_URL="mysql+aiomysql://dm:PASSWORD@127.0.0.1:3306/dungeon_master" \
+  uv run python scripts/migrate.py
+```
+
+### Changing the schema
+
+1. Write a new numbered file, e.g. `0002_add_campaign_notes.sql`. **Never edit
+   an existing one.**
+2. Update this document in the same commit.
+3. Run it locally and confirm the application still starts.
+4. Run it against production.
+
+### Expand and contract, for changes that cannot break
+
+Renaming a column in one step breaks every running copy of the old code the
+moment it lands. The safe pattern has three deploys:
+
+1. **Expand.** Add the new column. Write to both, read the old one.
+2. **Backfill.** Copy the values across. Switch reads to the new column.
+3. **Contract.** Drop the old column.
+
+Slower, but at no point is there a version of the code that cannot run against
+the version of the database in front of it — which is also what makes a
+rollback safe.
+
+**Migrations do not roll back.** To undo one, write a new migration that
+reverses it. This is why you should never drop a column the current code still
+reads: the rollback then becomes impossible rather than merely awkward.
 
 ---
 
-## Key rotation
+## Database permissions
 
-Every encrypted row carries a `dek_key_version`. When the master key in AWS KMS
-is rotated, existing rows keep their old version number and continue to decrypt
-correctly, because KMS can still unwrap keys created under previous generations.
-New writes use the new version.
+The application connects as a user that can read and write rows and nothing
+else:
 
-This means rotation is instant and does not require touching a single existing
-row. Re-encryption, if you ever want it, becomes a slow background job that
-walks rows with an old version number at whatever pace you like — not an outage.
+```sql
+GRANT SELECT, INSERT, UPDATE, DELETE ON dungeon_master.* TO 'dm'@'localhost';
+```
 
----
-
-## Where the keys actually live
-
-| Key | Purpose | Stored where | Reachable by the database? |
-|---|---|---|---|
-| KMS Customer Master Key | Wraps every user DEK | AWS KMS hardware | **No** |
-| Per-user DEK | Encrypts one user's data | Wrapped, in `users.dek_wrapped` | Only in wrapped form |
-| Blind index key | Fingerprints emails | AWS Secrets Manager | **No** |
-| IP salt | Fingerprints addresses, rotates daily | Generated in memory, cached in Secrets Manager | **No** |
-| Audit key | Encrypts support access reasons | AWS KMS, separate CMK | **No** |
-
-Read that column again: nothing in it says "the database". That is the design.
+No `CREATE`, no `DROP`, no `ALTER`. Migrations run separately with different
+credentials. If the running application cannot drop a table, neither can
+anyone who compromises it.
 
 ---
 
 ## Related documents
 
-- [DATABASE_OPERATIONS.md](DATABASE_OPERATIONS.md) — queries, stored
-  procedures, migrations, and database permissions.
-- [SECURITY.md](SECURITY.md) — how the encryption is actually implemented in
-  code.
-- [OBSERVABILITY.md](OBSERVABILITY.md) — the two telemetry planes in detail.
-- [Privacy decisions](../../docs/DECISIONS_PRIVACY.md) — why any of this.
+- [docs/LOCAL_MYSQL.md](../../docs/LOCAL_MYSQL.md) — install MySQL and look at
+  your data.
+- [SECURITY.md](SECURITY.md) — how data is protected.
+- [ARCHITECTURE.md](ARCHITECTURE.md) — where the repository layer sits.

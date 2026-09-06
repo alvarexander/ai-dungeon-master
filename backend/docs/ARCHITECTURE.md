@@ -59,13 +59,16 @@ a repository. Nothing calls backwards, and nothing skips a layer.
 
 ### Why this matters more than usual here
 
-In most projects layering is about tidiness. Here it is a security control.
+Two things follow from it.
 
-Because the repository is the **only** door to storage, it is impossible to
-save a user's email without passing through the code that encrypts it. There is
-no code path that reaches the database another way. Correctness stops depending
-on whether whoever writes the next endpoint remembers to encrypt — that is the
-whole point of a choke point.
+**Storage decisions live in one place.** Swapping the in-memory store for MySQL
+changes only the classes in `repositories/`, and no service or endpoint is
+aware it happened.
+
+**Ownership checks live in one place.** Every read includes the owner in the
+query rather than checking afterwards, so "can this account see this row?" is
+answered once instead of in every endpoint — and cannot be forgotten in the
+next one somebody writes.
 
 ### What belongs in each layer
 
@@ -73,40 +76,34 @@ whole point of a choke point.
 |---|---|---|
 | **Routes** (`app/api/v1/`) | Reading the request, declaring the response model, HTTP status codes | Game rules, arithmetic, storage access |
 | **Services** (`app/services/`) | Game rules, prompt assembly, orchestration | SQL, HTTP status codes, encryption |
-| **Repositories** (`app/repositories/`) | Encryption, decryption, storage access | Business decisions |
+| **Repositories** (`app/repositories/`) | All storage access, ownership checks | Business decisions |
 
 A useful test: if a function mentions both a status code and a dice roll, it is
 in the wrong place.
 
 ---
 
-## Where encryption sits relative to the ORM
+## Two storage backends
 
-**Above it.** This is a deliberate choice with a practical consequence.
+`REPOSITORY_BACKEND` chooses between them:
 
-An ORM (Object Relational Mapper) turns database rows into Python objects. If
-encryption happened inside or below it — in a model hook, or in a database
-trigger — then plaintext would already have travelled to the database server
-before being encrypted. It would appear in query logs, in slow-query logs, and
-in any network capture between Fly.io and AWS.
+| Value | What it is | Survives a restart? |
+|---|---|---|
+| `memory` (default) | Python dictionaries | No |
+| `mysql` | A real database, plain SQL | Yes |
 
-So encryption happens in the repository's mapping functions, before the ORM
-sees anything:
+Both satisfy the interfaces in `repositories/base.py`, so nothing above that
+layer knows which one it got. The in-memory store is the default so that the
+application runs with nothing installed — requiring a database installation
+before anything works is the point at which newcomers give up.
 
-```
-service          repository                    storage
---------         ----------                    -------
-User(            encrypt(email) ------------>  email_ct = b'\x01\x8f...'
-  email=         blind_index(email) -------->  email_bidx = b'\x9f\x2c...'
-  "a@b.com"      hash already done             password_hash = '$argon2id$...'
-)                username passes through --->  username = 'torchbearer'
-```
+`sql.py` uses hand-written SQL rather than an object mapper. Every query can be
+read, copied into a database client, and run. When something is slow or wrong,
+the thing to look at is right there rather than behind generated SQL. See
+[ADR-014](../../docs/DECISIONS_PLATFORM.md).
 
-By the time the database sees an email address, it is an opaque block of bytes.
-
-The concrete implementation is `MemoryUserRepository.create` in
-`app/repositories/memory.py`. Phase 2 adds a SQL implementation that encrypts at
-exactly the same boundary; nothing above it changes.
+**The one rule with no exceptions:** every query uses named parameters, never
+string joining.
 
 ---
 
@@ -196,44 +193,32 @@ count — and **never the prompt or the response.**
 
 ---
 
-## The trust boundary
+## How data is protected
 
-**Inside** — holds keys, assumed honest: the running application, AWS KMS.
+There is no application-layer encryption. Personal data is stored as readable
+values and protected by access control: TLS in transit, a firewall in front of
+the database, and a database user that can read and write rows but cannot
+change the schema.
 
-**Outside** — assumed compromised: the database, every backup, all logs.
+**Passwords are the exception** — hashed with Argon2id, never recoverable.
 
-```
-   INSIDE                         OUTSIDE
-   ------                         -------
-   backend  ---- ciphertext ---->  MySQL ----> backups
-      |                              ^
-   AWS KMS                           |
-   (master key                  an attacker with
-    never leaves)               a full copy reads:
-                                usernames, timestamps,
-                                counters, enums.
-                                Nothing else.
-```
-
-**Stated plainly:** this does not defend against someone who compromises the
-running server, because that server necessarily holds keys while working. That
-is a different and harder attack. Claiming otherwise would be dishonest.
+**Anyone who can query the database can read email addresses and
+conversations.** That is the honest consequence, and it makes the database
+credentials the most important secret in the system. See
+[SECURITY.md](SECURITY.md) and [ADR-002](../../docs/DECISIONS_PRIVACY.md).
 
 ---
 
-## Phase 1 versus Phase 2
+## What is not finished
 
-| | Phase 1 (now) | Phase 2 |
+| | Now | Next |
 |---|---|---|
-| Storage | In-memory, real encryption, development key | MySQL on RDS |
-| Keys | Fixed key in `.env`, loudly flagged | AWS KMS, per-user |
-| Sessions | Unsigned placeholder token | Signed, expiring, in `user_sessions` |
-| Rate limiting | In this process's memory | `sp_rate_limit_hit` stored procedure |
-| Analytics | In memory | `sp_analytics_record`, enum-enforced |
+| Sessions | Unsigned placeholder token | Signed, expiring, stored as a hash |
+| Password reset | Not implemented | Needs email delivery |
+| Rate limiting | One process's memory | Database-backed, before running two machines |
 
-Switching is configuration, not a rewrite, because both sides of each row
-satisfy the same interface. The schema and its migrations already exist and are
-runnable.
+The application refuses to start with stubbed authentication when
+`APP_ENV=production`.
 
 ---
 

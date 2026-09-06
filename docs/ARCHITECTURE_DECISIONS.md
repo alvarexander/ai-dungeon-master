@@ -1,17 +1,16 @@
 # Architecture Decisions — Index
 
-**Read this when** you need to find the reasoning behind a structural choice, or
-when you are about to change something significant and want to know what it will
+**Read this when** you need the reasoning behind a structural choice, or when
+you are about to change something significant and want to know what it will
 break.
 
-Every decision in this project was made once, deliberately, and written down.
-The decisions live in two files, split only because a single file would be too
-long to read comfortably:
+The decisions live in two files, split only because one would be long:
 
 - **[Platform decisions](DECISIONS_PLATFORM.md)** — the web framework, code
-  layering, rendering mode, and how three clouds are joined together.
-- **[Privacy decisions](DECISIONS_PRIVACY.md)** — encryption, login lookup,
-  password storage, deletion, telemetry, and speech-to-text.
+  layering, rendering mode, storage backends, and joining two clouds.
+- **[Security decisions](DECISIONS_PRIVACY.md)** — password storage, what the
+  database does and does not protect, analytics, deletion, rate limiting, and
+  speech-to-text.
 
 If you change a decision, update its entry in the same commit.
 
@@ -21,35 +20,28 @@ If you change a decision, update its entry in the same commit.
 
 | # | Decision | Where |
 |---|---|---|
-| ADR-001 | Python web framework: FastAPI | [Platform](DECISIONS_PLATFORM.md#adr-001-python-web-framework-fastapi) |
-| ADR-002 | Encryption strategy: application-layer envelope encryption | [Privacy](DECISIONS_PRIVACY.md#adr-002-encryption-strategy-application-layer-envelope-encryption) |
-| ADR-003 | Email lookup: keyed blind index | [Privacy](DECISIONS_PRIVACY.md#adr-003-email-lookup-keyed-blind-index) |
-| ADR-004 | Passwords are hashed, never encrypted | [Privacy](DECISIONS_PRIVACY.md#adr-004-passwords-are-hashed-never-encrypted) |
-| ADR-005 | Deletion by crypto-shredding | [Privacy](DECISIONS_PRIVACY.md#adr-005-deletion-by-crypto-shredding) |
-| ADR-006 | Two separate telemetry planes | [Privacy](DECISIONS_PRIVACY.md#adr-006-two-separate-telemetry-planes) |
-| ADR-007 | Rate limiting on hashed identifiers | [Privacy](DECISIONS_PRIVACY.md#adr-007-rate-limiting-on-hashed-identifiers) |
-| ADR-008 | Server-side speech-to-text, not the browser's Web Speech API | [Privacy](DECISIONS_PRIVACY.md#adr-008-server-side-speech-to-text-not-the-browser-s-web-speech-api) |
-| ADR-009 | Server-Side Rendering stays off | [Platform](DECISIONS_PLATFORM.md#adr-009-server-side-rendering-stays-off) |
-| ADR-010 | Layering: routes → services → repositories | [Platform](DECISIONS_PLATFORM.md#adr-010-layering-routes-services-repositories) |
-| ADR-011 | Cross-cloud database access: public endpoint, locked to one address | [Platform](DECISIONS_PLATFORM.md#adr-011-cross-cloud-database-access-public-endpoint-locked-to-one-address) |
-| ADR-012 | AWS credentials on Fly.io: OIDC federation, no stored keys | [Platform](DECISIONS_PLATFORM.md#adr-012-aws-credentials-on-fly-io-oidc-federation-no-stored-keys) |
-| ADR-013 | Phase 1 runs with no database | [Platform](DECISIONS_PLATFORM.md#adr-013-phase-1-runs-with-no-database) |
+| ADR-001 | Python web framework: FastAPI | [Platform](DECISIONS_PLATFORM.md) |
+| ADR-002 | Conventional security, not application-layer encryption | [Security](DECISIONS_PRIVACY.md) |
+| ADR-003 | Passwords are hashed with Argon2id, never encrypted | [Security](DECISIONS_PRIVACY.md) |
+| ADR-004 | Analytics has no free-text column | [Security](DECISIONS_PRIVACY.md) |
+| ADR-005 | Deletion removes the data | [Security](DECISIONS_PRIVACY.md) |
+| ADR-006 | Correlation identifiers for debugging | [Security](DECISIONS_PRIVACY.md) |
+| ADR-007 | Rate limiting | [Security](DECISIONS_PRIVACY.md) |
+| ADR-008 | Server-side speech-to-text, not the browser's Web Speech API | [Security](DECISIONS_PRIVACY.md) |
+| ADR-009 | Server-Side Rendering stays off | [Platform](DECISIONS_PLATFORM.md) |
+| ADR-010 | Layering: routes → services → repositories | [Platform](DECISIONS_PLATFORM.md) |
+| ADR-011 | Cross-cloud database access: public endpoint, locked to one address | [Platform](DECISIONS_PLATFORM.md) |
+| ADR-013 | Two storage backends behind one interface | [Platform](DECISIONS_PLATFORM.md) |
+| ADR-014 | Plain SQL, not an ORM | [Platform](DECISIONS_PLATFORM.md) |
 
 ---
 
-## The four that are expensive to reverse
+## The three worth reading first
 
-If you only read four entries, read these. Changing any of them later means
-rewriting stored data, not just code.
-
-1. **[ADR-002 — envelope encryption](DECISIONS_PRIVACY.md)** — every piece of
-   personal data is locked with a key unique to that user. Everything else in
-   the privacy design rests on this.
-2. **[ADR-005 — crypto-shredding](DECISIONS_PRIVACY.md)** — account deletion
-   destroys the key, not the data, which is how deletion reaches backups you
-   cannot edit.
-3. **[ADR-006 — two telemetry planes](DECISIONS_PRIVACY.md)** — aggregate
-   counters cannot be backfilled after users are deleted, so they must be
-   designed before you have users, not after.
-4. **[ADR-001 — FastAPI](DECISIONS_PLATFORM.md)** — the entire backend is
-   written in its idioms.
+1. **[ADR-002 — conventional security, not encryption](DECISIONS_PRIVACY.md)**
+   — what the database does and does not protect, and why an earlier
+   encryption design was deliberately removed.
+2. **[ADR-003 — Argon2id passwords](DECISIONS_PRIVACY.md)** — the one control
+   kept at full strength, and why hashing is not encryption.
+3. **[ADR-008 — local speech-to-text](DECISIONS_PRIVACY.md)** — the one place
+   this project spends real money on a data-handling choice, and the reasoning.

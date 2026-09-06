@@ -12,14 +12,14 @@ def test_requests_under_the_limit_are_allowed():
     rule = RateLimitRule(limit=5, window_seconds=900)
 
     for _ in range(5):
-        assert limiter.hit(b"bucket" + b"\0" * 26, "login", rule).allowed
+        assert limiter.hit("198.51.100.7", "login", rule).allowed
 
 
 def test_requests_over_the_limit_are_refused():
     """The sixth attempt in the window is stopped."""
     limiter = InMemoryRateLimiter()
     rule = RateLimitRule(limit=5, window_seconds=900)
-    bucket = b"bucket" + b"\0" * 26
+    bucket = "198.51.100.7"
 
     for _ in range(5):
         limiter.hit(bucket, "login", rule)
@@ -35,41 +35,21 @@ def test_different_callers_have_separate_allowances():
     limiter = InMemoryRateLimiter()
     rule = RateLimitRule(limit=2, window_seconds=60)
 
-    limiter.hit(b"a" * 32, "login", rule)
-    limiter.hit(b"a" * 32, "login", rule)
-    assert limiter.hit(b"a" * 32, "login", rule).allowed is False
-    assert limiter.hit(b"b" * 32, "login", rule).allowed is True
+    limiter.hit("198.51.100.1", "login", rule)
+    limiter.hit("198.51.100.1", "login", rule)
+    assert limiter.hit("198.51.100.1", "login", rule).allowed is False
+    assert limiter.hit("198.51.100.2", "login", rule).allowed is True
 
 
 def test_scopes_are_counted_separately():
     """Using up your login attempts does not stop you playing the game."""
     limiter = InMemoryRateLimiter()
     rule = RateLimitRule(limit=1, window_seconds=60)
-    bucket = b"c" * 32
+    bucket = "198.51.100.3"
 
     limiter.hit(bucket, "login", rule)
     assert limiter.hit(bucket, "login", rule).allowed is False
     assert limiter.hit(bucket, "chat", rule).allowed is True
-
-
-def test_the_whole_path_runs_on_a_digest(blind_index):
-    """The demonstration that abuse prevention needs no readable identifier.
-
-    An address goes in one end as text, is immediately fingerprinted, and from
-    that point on the rate limiter only ever sees 32 opaque bytes. Nothing in
-    the counter store can be turned back into an address.
-    """
-    limiter = InMemoryRateLimiter()
-    rule = RateLimitRule(limit=3, window_seconds=60)
-
-    bucket = blind_index.ip_digest("203.0.113.42")
-    assert isinstance(bucket, bytes)
-    assert len(bucket) == 32
-    assert b"203" not in bucket
-
-    for _ in range(3):
-        assert limiter.hit(bucket, "chat", rule).allowed
-    assert limiter.hit(bucket, "chat", rule).allowed is False
 
 
 def test_a_malformed_limit_is_rejected_at_startup():

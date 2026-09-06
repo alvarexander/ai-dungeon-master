@@ -22,11 +22,7 @@ both are ways real data escapes if you let it.
 
 from __future__ import annotations
 
-from typing import Generic, TypeVar
-
 from pydantic import BaseModel, ConfigDict, Field
-
-ItemT = TypeVar("ItemT")
 
 
 class ApiModel(BaseModel):
@@ -72,7 +68,7 @@ class ErrorResponse(ApiModel):
     error: ErrorDetail
 
 
-class Page(ApiModel, Generic[ItemT]):
+class Page[ItemT](ApiModel):
     """One page of a list of results.
 
     Paging exists here for a privacy reason as well as a performance one: every

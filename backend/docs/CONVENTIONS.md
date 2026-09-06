@@ -65,12 +65,8 @@ Include `Raises:` whenever the caller could reasonably be surprised.
 | Functions | lower_snake | `verify_password` |
 | Constants | UPPER_SNAKE | `KEY_CACHE_TTL_SECONDS` |
 | Private | leading underscore | `_daily_salt` |
-| Ciphertext columns | `_ct` suffix | `email_ct` |
-| Blind indexes | `_bidx` suffix | `email_bidx` |
-| Digests | `_hmac` suffix | `ip_hmac` |
 
-Those last three suffixes are load-bearing. Seeing `_ct` in a variable name
-should immediately tell a reader "these are bytes; do not try to print them".
+No special suffixes are needed: columns are named for what they hold.
 
 ---
 
@@ -182,8 +178,9 @@ inspects fields; it cannot inspect a message somebody has already interpolated.
 This is the one hole the allowlist cannot close, so it is a convention enforced
 by review.
 
-Adding a field to `LOGGABLE_FIELDS` is a privacy decision. Ask: if this
-appeared in a leaked log file, would it identify a person?
+The rule to follow: **log identifiers, not contents.** A `user_id` tells you
+which account without putting anybody's words in a file that gets copied to log
+aggregators and read by people.
 
 ---
 

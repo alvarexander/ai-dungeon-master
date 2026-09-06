@@ -1,95 +1,120 @@
-"""Tests for the log redaction allowlist.
+"""Tests that credentials never reach the log.
 
-The most important tests in the suite. Everything else protects data at rest;
-this protects it on the way past. A leak here would put plaintext into log
-files that are shipped to third-party services and read by humans.
+A log file is copied, shipped to other services, and read by people. Passwords
+and tokens must not be in it, even briefly, and these tests fail if that ever
+stops being true.
 """
 
 from __future__ import annotations
 
-from app.core.logging import LOGGABLE_FIELDS, describe, redaction_processor
+import pytest
+
+from app.core.logging import REDACTED, is_sensitive, redaction_processor
 
 
-def test_declared_fields_pass_through():
-    """Fields on the allowlist are written as they are."""
-    result = redaction_processor(None, "info", {"event": "login_succeeded", "status_code": 200})
-    assert result["event"] == "login_succeeded"
-    assert result["status_code"] == 200
+@pytest.mark.parametrize(
+    "field_name",
+    [
+        "password",
+        "Password",
+        "new_password",
+        "password_hash",
+        "api_key",
+        "GEMINI_API_KEY",
+        "apikey",
+        "access_token",
+        "refresh_token",
+        "authorization",
+        "cookie",
+        "client_secret",
+        "private_key",
+        "db_credential",
+    ],
+)
+def test_credential_shaped_names_are_recognised(field_name):
+    """Every common spelling of a secret is caught, including odd casings."""
+    assert is_sensitive(field_name) is True
 
 
-def test_undeclared_fields_are_replaced():
-    """A field nobody declared is censored, by default, without being asked."""
-    result = redaction_processor(None, "info", {"event": "x", "email": "player@example.com"})
-    assert result["email"] == "<str:len=18>"
-    assert "player" not in str(result)
+@pytest.mark.parametrize(
+    "field_name",
+    ["user_id", "status_code", "duration_ms", "event", "model_id", "tokens_in", "path"],
+)
+def test_ordinary_field_names_are_left_alone(field_name):
+    """Normal operational fields are not touched, or logs become useless."""
+    assert is_sensitive(field_name) is False
 
 
-def test_a_brand_new_field_is_censored():
-    """The point of an allowlist: tomorrow's field is protected today.
+def test_ai_token_counts_are_not_mistaken_for_credentials():
+    """`tokens_in` must survive, even though it contains the word "token".
 
-    A denylist protects only against the leaks somebody already thought of.
-    This test is the difference — a field invented after this code was written
-    is censored without anyone having to remember to add it.
+    A naive substring check redacts it, which silently destroys the numbers the
+    whole cost and performance story depends on — and looks like the filter
+    working correctly. Matching is on whole words for exactly this reason.
     """
     result = redaction_processor(
-        None, "info", {"event": "x", "recovery_phone_number": "+44 7700 900123"}
+        None, "info", {"event": "gemini_call_completed", "tokens_in": 820, "tokens_out": 240}
     )
-    assert "7700" not in str(result)
-    assert result["recovery_phone_number"].startswith("<str:len=")
+
+    assert result["tokens_in"] == 820
+    assert result["tokens_out"] == 240
 
 
-def test_censoring_reveals_shape_but_not_content():
-    """A censored value still helps debugging without disclosing anything."""
-    assert describe("player@example.com") == "<str:len=18>"
-    assert describe("") == "<str:len=0>"
-    assert describe(None) == "<none>"
-    assert describe({"a": 1, "b": 2}) == "<dict:keys=2>"
-    assert describe([1, 2, 3]) == "<list:len=3>"
-    assert describe(b"\x00\x01") == "<bytes:len=2>"
+def test_a_secret_value_is_replaced():
+    """The value goes; the field name stays, so you can still see it was there."""
+    result = redaction_processor(
+        None, "info", {"event": "login_attempt", "password": "correct-horse-battery"}
+    )
+
+    assert result["password"] == REDACTED
+    assert "correct-horse-battery" not in str(result)
+    assert result["event"] == "login_attempt"
 
 
-def test_numbers_are_censored_by_type_not_value():
-    """An undeclared number could be a date of birth, so its value is hidden."""
-    assert describe(1987) == "<int>"
-    assert describe(1.5) == "<float>"
+def test_several_secrets_are_all_replaced():
+    """One sensitive field in an entry does not mask another being missed."""
+    result = redaction_processor(
+        None,
+        "info",
+        {"event": "x", "api_key": "AIzaSy-something", "access_token": "abc123", "user_id": "u1"},
+    )
+
+    assert result["api_key"] == REDACTED
+    assert result["access_token"] == REDACTED
+    assert result["user_id"] == "u1"
 
 
 def test_the_filter_fails_closed():
     """If redaction itself breaks, nothing gets through.
 
-    A redaction filter that failed open would be worse than having none,
-    because it would create confidence that is not warranted.
+    A filter that failed open would be worse than having none at all, because
+    it would create confidence that is not warranted.
     """
-
-    class Explosive:
-        def __len__(self) -> int:
-            raise RuntimeError("boom")
-
-        def __repr__(self) -> str:
-            raise RuntimeError("boom")
 
     class ExplosiveDict(dict):
         def items(self):
             raise RuntimeError("boom")
 
-    result = redaction_processor(None, "error", ExplosiveDict(secret="player@example.com"))
+    exploding = ExplosiveDict(password="hunter2")  # noqa: S106 - deliberately fake
+    result = redaction_processor(None, "error", exploding)
+
     assert result["event"] == "log_redaction_failed"
-    assert "player" not in str(result)
+    assert "hunter2" not in str(result)
 
 
-def test_no_personal_field_names_are_on_the_allowlist():
-    """A guard against someone widening the allowlist to silence a warning.
+def test_no_endpoint_logs_a_request_body():
+    """The request body is never logged, only the shape of the request.
 
-    If a future change adds ``email`` to the allowlist to make a log line more
-    useful, this test fails and says why. That is the intended behaviour.
+    Read as a guard rather than a unit test: it checks the middleware records
+    the method, path, status and duration, and nothing from the body. If
+    somebody adds body logging, this is where it should be noticed.
     """
-    forbidden = {
-        "email", "phone", "first_name", "last_name", "password", "date_of_birth",
-        "ip", "ip_address", "client_ip", "transcript", "prompt", "response",
-        "content", "message", "backstory", "title", "premise", "name",
-    }
-    overlap = forbidden & LOGGABLE_FIELDS
-    assert not overlap, (
-        f"These personal-data field names have been added to the log allowlist: {overlap}. "
-        "Log an opaque identifier instead, or a length, or a category."
-    )
+    import inspect
+
+    from app.middleware.correlation import CorrelationMiddleware
+
+    source = inspect.getsource(CorrelationMiddleware)
+
+    assert "request_completed" in source
+    assert "await request.body()" not in source
+    assert "request.json()" not in source

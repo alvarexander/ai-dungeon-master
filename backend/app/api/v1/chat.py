@@ -11,11 +11,10 @@ from app.core.errors import NotFoundError
 from app.schemas.chat import (
     ChatTurnRequest,
     ChatTurnResponse,
-    DebugCaptureRequest,
     TokenUsage,
     TranscriptMessage,
 )
-from app.schemas.common import Acknowledgement, ErrorResponse
+from app.schemas.common import ErrorResponse
 
 router = APIRouter(prefix="/chat", tags=["dungeon master"])
 
@@ -167,50 +166,3 @@ async def list_messages(
     ]
 
 
-@router.post(
-    "/sessions/{session_id}/debug-capture",
-    response_model=Acknowledgement,
-    summary="Opt in to storing prompt content for debugging",
-)
-async def set_debug_capture(
-    session_id: UUID,
-    payload: DebugCaptureRequest,
-    user: CurrentUser,
-    container: ContainerDep,
-) -> Acknowledgement:
-    """Turn the opt-in prompt capture on or off for one session.
-
-    By default, prompt and response *content* is never stored — only metrics
-    like token counts and latency. That is the right default, and it means some
-    faults are hard to diagnose.
-
-    This is the escape hatch, and it is the player's to open. When switched on,
-    the exact prompt and reply are stored encrypted under the player's own key
-    for at most 48 hours, and are readable only through the audited support
-    flow, which writes an entry into the player's own visible activity log.
-
-    The interface presents this as "help us debug this session", because that
-    is precisely what it is.
-
-    Args:
-        session_id: Which session.
-        payload: Whether to switch capture on or off.
-        user: The account making the request.
-        container: The application container.
-
-    Returns:
-        A confirmation stating what is now true.
-
-    Raises:
-        NotFoundError: If the session does not exist or is not the caller's.
-    """
-    session = await container.sessions.set_debug_capture(user.user_id, session_id, payload.enabled)
-    if session is None:
-        raise NotFoundError("session")
-    detail = (
-        "Debug capture is on for this session. Prompt content will be stored, encrypted "
-        "with your key, for 48 hours and then deleted automatically."
-        if payload.enabled
-        else "Debug capture is off. No prompt content will be stored."
-    )
-    return Acknowledgement(detail=detail)

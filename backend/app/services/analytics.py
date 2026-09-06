@@ -1,42 +1,20 @@
-"""The analytics plane: counting activity without recording people.
+"""Records how the product is used, without recording what people wrote.
 
-TWO SEPARATE TELEMETRY SYSTEMS, AND WHY
-This application keeps two, with different rules, that never join to each
-other:
+WHAT IS COLLECTED
+Counts and categories: sessions started, turns taken, whether voice or typing
+was used, which features are opened, what kinds of error occur, how often the
+AI quota runs out.
 
-- **Analytics** (this file). Pseudonymous, aggregated, kept for a long time.
-  Answers "how is the product doing?".
-- **Debug telemetry** (the logs). Identified by request, kept for 14 days.
-  Answers "what happened to this one person just now?".
+WHAT IS NOT
+There is **no free-text field anywhere in the analytics schema**. Not "we agree
+not to put text there" — there is physically nowhere for it to land, so a
+careless change later cannot record what a player typed. Unknown event names
+and unknown categories are rejected at write time rather than accepted
+silently, so a mistake shows up during development instead of becoming a
+permanent gap in the data.
 
-Keeping them apart is what allows the first to be retained indefinitely without
-accumulating a history of anybody.
-
-THE PSEUDONYM
-Every user has an ``analytics_id``: a random identifier with no mathematical
-relationship to their ``user_id``. The link between the two lives in one
-encrypted mapping row. Analytics records reference only the pseudonym.
-
-The payoff appears at deletion. Destroying a user's key and their mapping row
-severs the link permanently — but it does *not* delete the events. Their past
-activity keeps counting toward the totals as an anonymous contribution that can
-never again be traced to anyone. You keep your business metrics; they get real
-deletion. Both, not a trade.
-
-THE ALLOWLIST IS A SCHEMA, NOT A CONVENTION
-Events accept only declared fields, and every field is an enumerated value, a
-boolean, a number, or a timestamp. **There is no free-text field anywhere in
-the analytics schema.** That is the mechanism, not a rule someone must
-remember: a careless future change cannot smuggle a player's message into
-analytics because there is physically nowhere for it to land. Unknown fields
-are rejected loudly rather than dropped quietly, so the mistake surfaces during
-development instead of silently losing data.
-
-GEOGRAPHY
-Country only, and never derived by keeping the address. In production
-Cloudflare sits in front of the API and adds a ``CF-IPCountry`` header, so the
-country arrives already computed and the address itself is never inspected,
-stored, or passed to a lookup service.
+That is the one thing worth keeping strict here: usage numbers are genuinely
+useful, and none of them require storing anything a person wrote.
 """
 
 from __future__ import annotations
@@ -44,7 +22,7 @@ from __future__ import annotations
 from collections import Counter
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from uuid import UUID, uuid4
+from uuid import UUID
 
 from app.core.logging import get_logger
 
@@ -121,7 +99,7 @@ class AnalyticsEvent:
     """One recorded event. Every field is an enum, a number, or a timestamp.
 
     Attributes:
-        analytics_id: The pseudonym. Never the user's real identifier.
+        user_id: Whose action this was.
         event_name: One of ``ALLOWED_EVENTS``.
         occurred_at: When it happened, UTC.
         country_code: Two-letter country, or ``None``. Never a city.
@@ -132,7 +110,7 @@ class AnalyticsEvent:
         success: A boolean, or ``None``.
     """
 
-    analytics_id: UUID
+    user_id: UUID
     event_name: str
     occurred_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     country_code: str | None = None
@@ -155,38 +133,19 @@ class AnalyticsService:
     def __init__(self) -> None:
         """Create an empty analytics store."""
         self._events: list[AnalyticsEvent] = []
-        # The pseudonym mapping. In production this is one encrypted column, so
-        # that destroying a user's key destroys the link automatically.
-        self._pseudonyms: dict[UUID, UUID] = {}
         self._aggregates: Counter[str] = Counter()
 
-    def analytics_id_for(self, user_id: UUID) -> UUID:
-        """Get or create the pseudonym for a user.
+    def forget(self, user_id: UUID) -> None:
+        """Remove a deleted user's events from the raw log.
+
+        The aggregate counters are left alone, so the totals stay correct.
+        Individual events go, because there is no reason to keep them once the
+        account is gone.
 
         Args:
-            user_id: The real account identifier.
-
-        Returns:
-            A random identifier unrelated to ``user_id``. Generated on first
-            use and remembered thereafter.
+            user_id: Whose events to remove.
         """
-        existing = self._pseudonyms.get(user_id)
-        if existing is None:
-            existing = uuid4()
-            self._pseudonyms[user_id] = existing
-        return existing
-
-    def sever(self, user_id: UUID) -> None:
-        """Break the link between a user and their analytics, permanently.
-
-        Called during account deletion. The events themselves are untouched and
-        keep contributing to the totals — but nothing can ever attribute them
-        to a person again.
-
-        Args:
-            user_id: Whose link to sever.
-        """
-        self._pseudonyms.pop(user_id, None)
+        self._events = [event for event in self._events if event.user_id != user_id]
 
     def record(
         self,
@@ -203,8 +162,7 @@ class AnalyticsService:
         """Record one event, after checking every field against the allowlist.
 
         Args:
-            user_id: Whose action this was. Converted to a pseudonym
-                immediately; the real identifier is not stored on the event.
+            user_id: Whose action this was.
             event_name: Must be in ``ALLOWED_EVENTS``.
             country_code: Two-letter country code, supplied by Cloudflare.
             duration_seconds: Bucketed before storage, never stored exactly.
@@ -230,7 +188,7 @@ class AnalyticsService:
             raise AnalyticsRejected("Country must be a two-letter code, or omitted.")
 
         event = AnalyticsEvent(
-            analytics_id=self.analytics_id_for(user_id),
+            user_id=user_id,
             event_name=event_name,
             country_code=country_code.upper() if country_code else None,
             duration_bucket=bucket_duration(duration_seconds) if duration_seconds is not None else None,

@@ -14,14 +14,15 @@ of them.
 
 | Stage | Monthly |
 |---|---|
-| Nothing deployed (Phase 1, local) | **$0** |
-| Deployed, database on Hostinger | **~$9** |
-| Deployed, first 12 months of a new AWS account | **~$12** |
-| Deployed, after the AWS free tier ends | **~$26** |
-| A few hundred active users | **~$45** |
+| Running locally | **$0** |
+| Deployed, database on Hostinger | **~$7** |
+| Deployed, database on AWS RDS, first 12 months | **~$11** |
+| Deployed, database on AWS RDS, after the free tier | **~$25** |
+| A few hundred active users | **~$40** |
 
-The cheapest working deployment is roughly **$9/month**: Hostinger you already
-pay for, a Fly machine, a static egress IP, and AWS for KMS only.
+The cheapest working deployment is roughly **$7/month**: the Hostinger plan you
+already pay for, a small Fly.io machine, and a static egress IP. **No AWS
+account is needed at all** on that path.
 
 ---
 
@@ -73,8 +74,8 @@ static egress IP already exists for. It also removes the cross-cloud database
 problem completely.
 
 Two things must be verified first, because shared hosting does not guarantee
-them: TLS on the connection, and permission to create stored procedures. Both
-checks take ten minutes and are Part 1 of
+it: whether the connection can use TLS. That check takes five minutes and is
+Part 1 of
 [DEPLOY_MYSQL_HOSTINGER.md](DEPLOY_MYSQL_HOSTINGER.md).
 
 **Fallback: AWS RDS**
@@ -91,24 +92,6 @@ Hostinger.**
 
 The AWS free tier runs 12 months **from account creation**, not from creating
 the instance. If your account is already older than that, you pay from day one.
-
-### AWS KMS
-
-| Item | Monthly |
-|---|---|
-| 2 customer master keys (data + audit) | $2 |
-| API calls | ~$0.10 |
-
-Calls are $0.03 per 10,000. The application caches an unwrapped key for five
-minutes, so a user playing a long session costs a handful of calls, not one per
-message. Reaching a meaningful bill here would take a very large number of
-users.
-
-### AWS Secrets Manager
-
-$0.40/month for the blind index key. Alternatively store it as a Fly secret and
-pay nothing — slightly less tidy, equally safe, since it never touches the
-database either way.
 
 ### Google Gemini
 
@@ -150,7 +133,6 @@ More than enough.
 | Hostinger | $3 |
 | Fly.io | $8 (scale-to-zero) |
 | RDS | $0.50 |
-| KMS | $2 |
 | Gemini | $0 |
 | **Total** | **~$14** |
 
@@ -161,9 +143,8 @@ More than enough.
 | Hostinger | $3 |
 | Fly.io | $11 |
 | RDS | $14.50 |
-| KMS + Secrets | $2.50 |
 | Gemini (paid, small) | $3 |
-| **Total** | **~$34** |
+| **Total** | **~$31.50** |
 
 ### With the database on Hostinger
 
@@ -172,12 +153,11 @@ More than enough.
 | Hostinger (hosting + MySQL) | $3 |
 | Fly.io | $11 |
 | Database | **$0** |
-| KMS + Secrets | $2.50 |
 | Gemini (paid, small) | $3 |
-| **Total** | **~$19.50** |
+| **Total** | **~$17** |
 
-AWS is still needed — but only for KMS, which holds the encryption keys. There
-is no Hostinger equivalent, and the whole privacy design rests on it.
+**No AWS account at all** on this path — which is one fewer provider, one fewer
+bill, and one fewer console to learn.
 
 ---
 
@@ -189,13 +169,13 @@ choice rather than a surprise.
 | Control | Extra cost | What it buys |
 |---|---|---|
 | **Local speech-to-text** | **~$4/month** — 1 GB instead of 256 MB | Voice recordings never reach Google |
-| KMS envelope encryption | ~$2/month | A stolen database is unreadable |
-| Separate audit key | ~$1/month | Deletion cannot erase who read your data |
-| Everything else | $0 | Blind indexes, hashed IPs, log redaction, the two telemetry planes — all pure code |
+| Argon2id password hashing | $0, but 64 MB per concurrent login | A stolen database does not hand over passwords |
+| TLS, firewall, limited database user | $0 | Access control on the data |
+| Log redaction, analytics with no free-text column | $0 | Credentials stay out of logs; nothing typed reaches analytics |
 
-**About $7 a month.** The striking part is the last row: almost all of the
-privacy design costs nothing but the decision to do it that way. Only the ones
-needing hardware or a bigger machine cost money.
+**About $4 a month.** Almost every protection here costs nothing but the
+decision to do it that way. The single exception is transcribing audio on your
+own server rather than sending it to Google, which needs a bigger machine.
 
 ---
 
@@ -215,12 +195,12 @@ session each.
 
 ### 2. Rate limiting, the moment you run two machines — at about 50 concurrent users
 
-Phase 1 counts rate limits in one process's memory. Two machines keep separate
+Rate limits are counted in one process's memory. Two machines keep separate
 tallies, so every limit silently doubles.
 
 **Symptom:** none. It quietly stops working, which is the worst kind.
-**Fix:** switch to the `sp_rate_limit_hit` stored procedure **before** scaling
-past one machine. The code and schema already exist.
+**Fix:** move the counters into the database **before** scaling past one
+machine.
 
 ### 3. Memory during transcription — at about 5 simultaneous speakers
 

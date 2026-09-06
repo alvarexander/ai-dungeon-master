@@ -6,21 +6,10 @@ minutes from one address." It is the main defence against three separate
 problems: someone guessing passwords, someone probing which email addresses are
 registered, and someone burning through the Gemini free tier for fun.
 
-THE PRIVACY PROBLEM, AND WHY IT IS NOT A PROBLEM
-Counting per network address normally means storing network addresses, and an
-IP address is personal data. That would appear to force a hole in the privacy
-design.
-
-It does not. What rate limiting actually needs is a *stable key* — something
-that is the same for the same caller and different for a different one. It does
-not need the key to be readable. So the key is an HMAC fingerprint of the
-address, computed with a salt that rotates daily and is never stored next to
-the counters.
-
-The consequence is worth stating plainly: **the entire abuse-prevention path
-runs without a single decryption call and without one readable identifier.**
-Privacy and security do not trade against each other here — see
-:func:`app.core.security.blind_index.BlindIndexService.ip_digest`.
+WHAT GETS COUNTED
+The caller's network address. Counters are short-lived — a window is a minute
+or fifteen — and stale windows are discarded, so this is a working tally rather
+than a record of anybody's activity.
 
 PHASE 1 VERSUS PHASE 2
 Phase 1 counts in this server's memory. That is correct for one machine and
@@ -62,7 +51,7 @@ class RateLimitResult:
 class RateLimiter(Protocol):
     """The contract shared by the in-memory and database-backed limiters."""
 
-    def hit(self, bucket: bytes, scope: str, rule: RateLimitRule) -> RateLimitResult:
+    def hit(self, bucket: str, scope: str, rule: RateLimitRule) -> RateLimitResult:
         """Count one request and report whether it is permitted.
 
         Args:
@@ -97,14 +86,14 @@ class InMemoryRateLimiter:
     def __init__(self) -> None:
         """Create an empty limiter."""
         # Maps (bucket, scope, window index) to a count.
-        self._counters: dict[tuple[bytes, str, int], int] = {}
+        self._counters: dict[tuple[str, str, int], int] = {}
         # Requests are handled concurrently, so the counter needs a lock to
         # avoid two of them reading the same value and both writing back one
         # more than it — which would let a caller exceed the limit.
         self._lock = threading.Lock()
         self._last_prune = time.monotonic()
 
-    def hit(self, bucket: bytes, scope: str, rule: RateLimitRule) -> RateLimitResult:
+    def hit(self, bucket: str, scope: str, rule: RateLimitRule) -> RateLimitResult:
         """Count one request against a limit.
 
         Args:

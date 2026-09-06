@@ -111,12 +111,10 @@ never reach Git, and are not visible in the dashboard after being set.
 
 ```bash
 fly secrets set GEMINI_API_KEY="your-real-key-here"
-fly secrets set BLIND_INDEX_KEY="$(python3 -c 'import os,base64; print(base64.b64encode(os.urandom(32)).decode())')"
-fly secrets set IP_HASH_SECRET="$(python3 -c 'import os,base64; print(base64.b64encode(os.urandom(32)).decode())')"
-fly secrets set DATABASE_URL="mysql+aiomysql://dm_app:PASSWORD@your-db.rds.amazonaws.com:3306/dungeon_master"
-fly secrets set KMS_KEY_ARN="arn:aws:kms:eu-west-2:000000000000:key/..."
-fly secrets set KMS_AUDIT_KEY_ARN="arn:aws:kms:eu-west-2:000000000000:key/..."
+fly secrets set DATABASE_URL="mysql+aiomysql://dm:PASSWORD@your-db-host:3306/dungeon_master?ssl=true"
 ```
+
+**Two secrets. That is all of them.**
 
 **Expect:** `Secrets are staged for the first deployment` (or a restart if the
 app is already running).
@@ -131,9 +129,13 @@ fly secrets list     # names and digests only, never values
 frequently made public later. Rotating a key that has been committed means
 rotating it everywhere *and* accepting it may already be copied.
 
-**Guard `BLIND_INDEX_KEY` especially.** Its absence from the database is the
-entire reason a stolen dump cannot be tested against a guessed email address.
-Generate it once, store it in a password manager, and never log it.
+**The database password is the one that matters most.** Anyone who has it can
+read every email address and every conversation. Generate it rather than
+inventing it:
+
+```bash
+python3 -c "import secrets; print(secrets.token_urlsafe(32))"
+```
 
 ---
 
@@ -272,7 +274,6 @@ read their data — it is encrypted, and that is the point.
 | `out of memory` / `OOM` | Machine too small | `fly scale memory 2048` |
 | `smoke checks failed` | The app crashed at startup | `fly logs` for the real error above it |
 | `gemini_quota_exhausted` | Free AI allowance spent | Expected; consider billing |
-| `KeyProviderError` | KMS refused | Check the role and key policy |
 | `Could not reach the AI service` | No egress, or wrong base URL | Check `GEMINI_BASE_URL` |
 
 ```bash
@@ -302,6 +303,6 @@ If a deployment changed a secret, change it back explicitly.
 ## Related documents
 
 - [The cross-cloud problem](DEPLOY_CROSS_CLOUD.md) — reaching the database.
-- [Cross-cutting concerns](DEPLOY_CROSS_CUTTING.md) — CORS, KMS identity, order.
+- [Cross-cutting concerns](DEPLOY_CROSS_CUTTING.md) — CORS, secrets, order.
 - [Frontend deployment](DEPLOY_ANGULAR_HOSTINGER.md) — do this second.
 - [Costs](COSTS.md).

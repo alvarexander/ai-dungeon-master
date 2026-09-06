@@ -51,16 +51,16 @@ touches it.
 
 **Effort:** 3–4 days.
 
-### 2.3 Real KMS
+### 2.3 Harden the database
 
-- Two customer master keys: user data and audit.
-- The OIDC trust relationship, so no static AWS key exists anywhere
-  ([guide](DEPLOY_CROSS_CUTTING.md)).
-- The deny policy that stops your own administrator role decrypting user data.
-- The break-glass role, with a CloudTrail alarm — **and practise using it once**,
-  so the first time is not during an incident.
+- Move it off your laptop: [Hostinger](DEPLOY_MYSQL_HOSTINGER.md) is free if you
+  already pay for hosting; [RDS](DEPLOY_MYSQL_RDS.md) is the alternative.
+- Require TLS on the connection.
+- Restrict access to the backend's address only.
+- Confirm backups are running, and **restore one once** to prove they work. An
+  untested backup is a hope, not a backup.
 
-**Effort:** 1–2 days, most of it reading AWS policy documentation.
+**Effort:** half a day.
 
 ### 2.4 Database-backed rate limiting
 

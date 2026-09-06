@@ -110,24 +110,6 @@ reused with the same key.
 time, but the input cannot be recovered, and without the key nobody can even
 compute it to check a guess.
 
-**Blind index** — a searchable HMAC fingerprint of an encrypted value, letting
-the database find a row by email without ever holding an email.
-
-**Envelope encryption** — encrypting data with a key, then encrypting that key
-with another key, and storing the wrapped key beside the data. A key in an
-envelope, next to what it opens.
-
-**DEK (Data Encryption Key)** — the per-user key that encrypts one person's
-data.
-
-**KMS (Key Management Service)** — AWS's service that holds master keys inside
-hardware and never releases them. It will wrap and unwrap keys on request, if
-the requester is permitted.
-
-**Crypto-shredding** — deleting data by destroying its key rather than by
-erasing it. Effective everywhere the data exists at once, including backups
-nobody can edit.
-
 **Encryption at rest** — the disks are encrypted. Defends against physical
 theft, and does nothing against someone who can run a query, because the
 database decrypts transparently for them.

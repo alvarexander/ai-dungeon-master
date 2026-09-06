@@ -57,13 +57,12 @@ with three different providers:
 |---|---|---|
 | Frontend | Angular 22, standalone components, signals, **no SSR** | Hostinger (static files) |
 | Backend | Python 3.12, FastAPI | Fly.io (container) |
-| Database | MySQL | AWS RDS |
+| Database | MySQL | Hostinger (free with your plan) or AWS RDS |
 
-Today all three run on your laptop, with the database replaced by an in-memory
-store. Keeping them separate from the start forces three things to be right
-that are painful to retrofit: the frontend must build to plain files, the two
-halves must cope with being on different web addresses, and the backend must
-reach a database in another company's network.
+Today all three run on your laptop. Keeping them separate from the start forces
+two things to be right that are painful to retrofit: the frontend must build to
+plain files with no server process, and the two halves must cope with being on
+different web addresses.
 
 ---
 
@@ -71,32 +70,33 @@ reach a database in another company's network.
 
 Most of the effort here went somewhere that is not visible on screen.
 
-**Everything personal is encrypted with a key belonging to one user.** Email
-addresses, campaign titles, character names, and every message in every
-conversation. Somebody who stole a complete copy of the database would find
-usernames and timestamps, and nothing else they could read.
-
-**Deleting an account destroys the key rather than the data.** Which makes it
-effective in backups nobody can reach into and edit — and genuinely
-irreversible, including by us.
-
-**Logs censor by default.** A field not explicitly declared safe to log is
-replaced by a description of its type and length. A field invented tomorrow is
-protected today.
+**Passwords are hashed with Argon2id and never stored.** Not encrypted —
+hashed, one way, unrecoverable by anybody including us. The distinction is
+[written down](docs/DECISIONS_PRIVACY.md), because it is the one newcomers most
+often get wrong.
 
 **Voice never reaches Google.** The browser's built-in speech recognition
 streams raw microphone audio to Google's servers, so it is not used.
-Transcription happens on our own server instead. That costs about five dollars
-a month, and the reasoning is written down in
-[ADR-008](docs/DECISIONS_PRIVACY.md).
+Transcription happens on our own server instead. That costs about four dollars
+a month, and the reasoning is in [ADR-008](docs/DECISIONS_PRIVACY.md).
 
-**Abuse prevention needs no plaintext.** Rate limiting counts fingerprints of
-addresses, using a salt that changes daily and is never stored. Privacy and
-security do not trade off against each other.
+**Analytics cannot record what people typed.** Not by convention — there is
+physically no free-text column in the analytics table, so a careless change
+later cannot start collecting one.
+
+**Every query includes the owner.** Ownership is part of the `WHERE` clause
+rather than checked afterwards, so one account cannot reach another's rows by
+guessing an identifier. Every SQL query uses named parameters, which makes
+injection impossible rather than unlikely.
 
 **The application refuses to start** if it is marked as production while any
-development shortcut remains — a written-down encryption key, stubbed
-authentication, logging with redaction switched off.
+development shortcut remains — stubbed authentication, insecure cookies, a
+database without TLS.
+
+**And a deliberate non-feature:** there is no application-layer encryption of
+personal data. That was considered, built, and then removed on purpose —
+[ADR-002](docs/DECISIONS_PRIVACY.md) explains why, and is honest about what it
+costs.
 
 The reasoning for each of these is in
 [docs/ARCHITECTURE_DECISIONS.md](docs/ARCHITECTURE_DECISIONS.md), together with
@@ -113,9 +113,9 @@ afternoon:
   email lookup are all real. The *session token* is a placeholder the backend
   does not verify. Every affected screen says so on screen, and the backend
   will not start in production this way.
-- **The database.** Fully designed, with runnable migrations and stored
-  procedures, and connected to nothing. Phase 1 keeps everything in memory, so
-  a restart loses it all.
+- **The database.** MySQL works — set `REPOSITORY_BACKEND=mysql` and follow
+  [docs/LOCAL_MYSQL.md](docs/LOCAL_MYSQL.md). The default is an in-memory store
+  that needs nothing installed and loses everything on restart.
 - **Password reset and changing your email.** Both need email delivery.
 - **Deployment.** Documented in full; not performed.
 
@@ -124,15 +124,15 @@ afternoon:
 ## Tests
 
 ```bash
-cd backend  && uv run pytest    # 88
+cd backend  && uv run pytest    # 90
 cd frontend && npm test         # 18
 ```
 
-The backend suite runs the **real** encryption rather than a mock, because a
-mock of encryption proves nothing. It verifies that ciphertext does not contain
-the plaintext, that a value cannot be moved between users or columns, that
-tampering is detected, that a deleted user's data is unreadable, and that the
-log filter censors a field nobody has declared.
+The backend suite runs **real** Argon2id rather than a mock. It also verifies
+that credentials never reach a log, that the SSRF guard refuses internal
+addresses, that login failures are indistinguishable whether or not an account
+exists, that validation errors never echo the submitted value, and that one
+account cannot read another's campaigns.
 
 ---
 

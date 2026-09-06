@@ -4,8 +4,8 @@
 actually prove.
 
 ```bash
-uv run pytest                          # all of them, about 2 seconds
-uv run pytest tests/test_encryption.py # one file
+uv run pytest                          # all 90, about 2 seconds
+uv run pytest tests/test_redaction.py  # one file
 uv run pytest -k redaction             # by name
 uv run pytest --cov=app --cov-report=term-missing
 ```
@@ -34,16 +34,13 @@ Gemini client is replaced by `FakeGemini`, which records what it was asked.
 | Component | Faked? | Why |
 |---|---|---|
 | Gemini | **Yes** | See rule 2 above |
-| Encryption | **No** | It runs the real AES-256-GCM against the development key. A mock of encryption would prove nothing, and encryption is the part most worth testing |
-| Blind index | **No** | Same reasoning |
-| Password hashing | **No** | Real Argon2id. It makes the auth tests slower and they are still fast enough |
+| Password hashing | **No** | Real Argon2id. It makes the authentication tests slower and means they verify the thing that matters |
 | Rate limiting | **No** | Real counters |
-| Storage | In-memory | Which is what Phase 1 uses in production anyway |
+| Storage | In-memory | Which is what the default configuration uses anyway |
 
-**Encryption not being mocked is the single most important line in this table.**
-The suite proves that ciphertext does not contain the plaintext, that a value
-cannot be moved between users or columns, and that tampering is detected — none
-of which a mock could tell you.
+**Password hashing not being mocked is the important row.** It is the one
+control protecting something that cannot be re-issued if it leaks, so the tests
+exercise the real thing.
 
 ---
 
@@ -69,43 +66,18 @@ keeps the suite reproducible on any machine regardless of the developer's
 
 ## What the suite proves
 
-Grouped by what would break if someone got it wrong.
+Grouped by what would break if somebody got it wrong.
 
-### `test_encryption.py` — the foundation
+### `test_redaction.py` — credentials stay out of logs
 
-- Ciphertext does not contain the plaintext.
-- The same text encrypts differently every time (which is why a blind index is
-  needed at all).
-- **A value encrypted for one column will not decrypt as another.**
-- **A value encrypted for one user will not decrypt for another.**
-- Flipping one bit causes a loud failure, not corrupted output.
-- A shredded user's data cannot be decrypted, at all, ever.
-
-The two bold ones are the additional-authenticated-data binding. They close an
-attack where rows are shuffled rather than read.
-
-### `test_blind_index.py` — searching without reading
-
-- Determinism, and that capitalisation and whitespace do not create duplicates.
-- The digest contains no trace of the address.
-- **Without the key, the fingerprint cannot be recomputed** — the property that
-  stops a stolen dump being tested against a guessed address.
-- **IP fingerprints differ from one day to the next**, so counter rows cannot be
-  assembled into a history.
-
-### `test_redaction.py` — the most important file in the suite
-
-Everything else protects data at rest. This protects it on the way past, into
-log files that get shipped to third-party services and read by humans.
-
-- Declared fields pass through; undeclared ones are censored.
-- **A field invented after the code was written is censored by default.** This
-  is the allowlist earning its keep.
-- Censoring reveals shape but never content.
-- **The filter fails closed** — if it raises, nothing gets through.
-- **No personal field name has been added to the allowlist.** This test exists
-  to fail if a future change widens the allowlist to make a log line more
-  useful. That failure is the intended behaviour.
+- Every common spelling of a secret is caught: `password`, `api_key`,
+  `access_token`, `authorization`, `client_secret`, and odd casings of each.
+- **`tokens_in` is not mistaken for a credential.** A naive substring check on
+  `token` redacts the AI token counts, silently destroying the numbers the
+  whole cost story depends on — and it looks like the filter working. That is a
+  real bug this test caught.
+- The filter **fails closed**: if it raises, nothing gets through.
+- No endpoint logs a request body.
 
 ### `test_ssrf.py` — outbound safety
 
@@ -116,11 +88,9 @@ log files that get shipped to third-party services and read by humans.
 - An unparseable address is treated as unsafe, because the safe answer to "I do
   not understand this" is no.
 
-### `test_ratelimit.py` — abuse prevention without plaintext
+### `test_ratelimit.py` — abuse prevention
 
 - Limits allow and then refuse; callers and scopes are counted separately.
-- **The whole path runs on a 32-byte digest.** This is the test backing the
-  claim that privacy and security do not trade off here.
 - A malformed limit in configuration stops startup rather than silently
   disabling a limit.
 
@@ -145,22 +115,18 @@ log files that get shipped to third-party services and read by humans.
 ### `test_chat.py` — the game loop
 
 - A turn returns narration and stores both messages.
-- **The stored transcript is ciphertext** — this test reaches into the store and
-  asserts the words are not in the bytes.
 - **Personal data is scrubbed before reaching the model**, but the player's own
-  words are kept unscrubbed for them. It is their campaign.
+  words are stored unchanged for them. It is their campaign.
 - Over-long, empty, and unknown-field requests are rejected.
+- A session belonging to somebody else is not readable.
 
-### `test_deletion_and_analytics.py` — deletion and the allowlist
+### `test_deletion_and_analytics.py` — deletion and the analytics allowlist
 
-- **Crypto-shredding leaves the ciphertext in place and destroys the key**, and
-  the account then cannot be used or found.
+- **Deleting an account removes everything it owned**, and the account then
+  cannot be used or found.
 - Deletion requires exact confirmation.
 - Analytics rejects undeclared events, features and categories.
-- The analytics identifier is unrelated to the account identifier.
-- **Severing the link keeps the counts and orphans the events.**
-
----
+- **Deleting a user clears their events but keeps the totals correct.**
 
 ## Writing a new test
 
@@ -216,10 +182,9 @@ Creates three accounts with campaigns and characters, using Faker with a fixed
 seed so the same invented people appear every run — which makes debugging
 repeatable.
 
-**Never copy production data to a laptop.** It would defeat every control at
-once: a developer machine has no KMS key policy, no audit log, no redacted
-logging, and is backed up to somebody's personal cloud storage. One copy and
-the boundary is gone.
+**Never copy production data to a laptop.** A developer machine has no
+firewall in front of it, no access logging, and is backed up to somebody's
+personal cloud storage. One copy and every control you put in place is gone.
 
 The script goes through the real API rather than writing to the store directly,
 so seeded data passes through the same validation and encryption as real data.
@@ -227,19 +192,18 @@ If the seed script works, the real path works.
 
 ---
 
-## Local versus production security posture
+## Local versus production
 
 | | Local | Production |
 |---|---|---|
-| Encryption key | Fixed, in `.env`, published | AWS KMS hardware |
-| Can you read the data? | Yes, deliberately | No, not even as administrator |
-| Authentication | Stubbed | Signed tokens |
-| Storage | Memory | MySQL with TLS |
-| Logs | Console, redaction on | JSON, redaction enforced |
+| Storage | Memory, or a local MySQL | MySQL behind a firewall |
+| Database reachable from | Your machine only | The backend's address only |
+| Authentication | Stubbed | Signed tokens (Phase 2) |
+| Connection | Plain, on localhost | TLS, enforced by the server |
+| Logs | Console | JSON, shipped somewhere |
 
-Local is deliberately inspectable so you can see what is happening. The
-application prints a large `DEVELOPMENT MODE — NOT SECURE` banner at startup
-and **refuses to start** in these modes when `APP_ENV=production`.
+The application prints a `DEVELOPMENT MODE — NOT SECURE` banner at startup and
+**refuses to start** with stubbed authentication when `APP_ENV=production`.
 
 **Never point local configuration at production data.** There is no safe
 version of that, and the fail-closed checks exist because good intentions are

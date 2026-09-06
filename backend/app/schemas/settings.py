@@ -71,9 +71,8 @@ class AccountDeletionRequest(ApiModel):
 
     confirm_username: str = Field(
         description=(
-            "The account's username, typed again. A deliberate friction step: this "
-            "action destroys the encryption key and cannot be undone by anyone, "
-            "including us, including from backups."
+            "The account's username, typed again. A deliberate friction step, because "
+            "this permanently removes every campaign, character and conversation."
         ),
         examples=["torchbearer"],
     )
@@ -84,15 +83,14 @@ class AccountDeletionRequest(ApiModel):
 
 
 class AccountDeletionResponse(ApiModel):
-    """Proof that an account was crypto-shredded."""
+    """Confirmation that an account and all its data were deleted."""
 
     user_id: str = Field(examples=["9c1e5b70-2b6a-4a4e-9d6a-2f0c1b5e7a31"])
-    shredded_at: str = Field(examples=["2026-09-06T11:00:00Z"])
+    deleted_at: str = Field(examples=["2026-09-06T11:00:00Z"])
     detail: str = Field(
         examples=[
-            "Your encryption key has been destroyed. Every piece of your data — in the "
-            "live database and in every backup — is now permanently unreadable, "
-            "including by us."
+            "Your account has been deleted, along with every campaign, character and "
+            "conversation."
         ]
     )
 
