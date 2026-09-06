@@ -1,6 +1,14 @@
 # The Cross-Cloud Problem
 
-**Read this when** you are connecting the Fly.io backend to the AWS database.
+**Read this when** you are connecting the Fly.io backend to a database in
+**AWS RDS**.
+
+> **You may not need this document at all.** It exists because a backend on
+> Fly.io cannot reach a database inside an AWS private network. If you put the
+> database on [Hostinger](DEPLOY_MYSQL_HOSTINGER.md) instead, that problem does
+> not arise — you whitelist one IP in hPanel and you are finished. You will
+> still need [the KMS half](DEPLOY_CROSS_CUTTING.md) of the cross-cloud story,
+> because the encryption keys stay in AWS regardless.
 **This is the hardest part of the whole deployment**, and the part where a
 wrong choice is most expensive to undo, so it gets its own document.
 

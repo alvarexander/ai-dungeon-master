@@ -145,8 +145,9 @@ this order makes every failure diagnosable in isolation.
 
 | Order | Tier | Guide |
 |---|---|---|
-| 1 | **MySQL on AWS RDS** | [DEPLOY_MYSQL_RDS.md](docs/DEPLOY_MYSQL_RDS.md) |
-| — | **The cross-cloud problem** | [DEPLOY_CROSS_CLOUD.md](docs/DEPLOY_CROSS_CLOUD.md) — **read before step 1** |
+| 1 | **MySQL — cheapest path** | [DEPLOY_MYSQL_HOSTINGER.md](docs/DEPLOY_MYSQL_HOSTINGER.md) — uses the database already included with your Hostinger plan. $0 |
+| 1 | **MySQL — fallback** | [DEPLOY_MYSQL_RDS.md](docs/DEPLOY_MYSQL_RDS.md) — free 12 months, then ~$14 |
+| — | **The cross-cloud problem** | [DEPLOY_CROSS_CLOUD.md](docs/DEPLOY_CROSS_CLOUD.md) — **only if you chose RDS.** Hostinger removes this problem entirely |
 | 2 | **Python on Fly.io** | [DEPLOY_PYTHON_FLYIO.md](docs/DEPLOY_PYTHON_FLYIO.md) |
 | 3 | **Angular on Hostinger** | [DEPLOY_ANGULAR_HOSTINGER.md](docs/DEPLOY_ANGULAR_HOSTINGER.md) |
 | 4 | **Cloudflare** | [CLOUDFLARE_WAF_PROMPT.md](CLOUDFLARE_WAF_PROMPT.md) |
@@ -179,7 +180,9 @@ recreated, then silently stops.
 
 ### Verify between each step
 
-- **After the database:** 13 tables, 13 procedures, the app user cannot `DROP`.
+- **After the database:** 13 tables and 13 procedures. On RDS, also confirm the
+  application user cannot `DROP` — shared hosting cannot enforce that, which is
+  a documented trade of the cheaper path.
 - **After the backend:** `/health/ready` returns an **empty `warnings` list**.
   Do not continue while anything is in it.
 - **After the frontend:** a deep link like `/settings` does not 404, and

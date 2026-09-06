@@ -15,9 +15,13 @@ of them.
 | Stage | Monthly |
 |---|---|
 | Nothing deployed (Phase 1, local) | **$0** |
+| Deployed, database on Hostinger | **~$9** |
 | Deployed, first 12 months of a new AWS account | **~$12** |
 | Deployed, after the AWS free tier ends | **~$26** |
 | A few hundred active users | **~$45** |
+
+The cheapest working deployment is roughly **$9/month**: Hostinger you already
+pay for, a Fly machine, a static egress IP, and AWS for KMS only.
 
 ---
 
@@ -59,7 +63,21 @@ change. Without a static one, your AWS security group silently stops matching
 at some point, with no deployment to blame. See
 [the cross-cloud guide](DEPLOY_CROSS_CLOUD.md).
 
-### Database — AWS RDS
+### Database — two options
+
+**Cheapest: the MySQL already included with Hostinger — $0.**
+
+You are already paying Hostinger for the frontend, and their plans include
+MySQL with Remote MySQL access by IP allowlist — the same mechanism the Fly
+static egress IP already exists for. It also removes the cross-cloud database
+problem completely.
+
+Two things must be verified first, because shared hosting does not guarantee
+them: TLS on the connection, and permission to create stored procedures. Both
+checks take ten minutes and are Part 1 of
+[DEPLOY_MYSQL_HOSTINGER.md](DEPLOY_MYSQL_HOSTINGER.md).
+
+**Fallback: AWS RDS**
 
 | Item | Monthly | Free tier |
 |---|---|---|
@@ -68,7 +86,8 @@ at some point, with no deployment to blame. See
 | Backups (7 days) | $0 | Free up to the instance size |
 | Data transfer out | ~$0.50 | Small; queries return little |
 
-**Subtotal: ~$14.50, or ~$0.50 during the free-tier year.**
+**Subtotal: ~$14.50, or ~$0.50 during the free-tier year — or $0 on
+Hostinger.**
 
 The AWS free tier runs 12 months **from account creation**, not from creating
 the instance. If your account is already older than that, you pay from day one.
@@ -135,7 +154,7 @@ More than enough.
 | Gemini | $0 |
 | **Total** | **~$14** |
 
-### After the free tier
+### After the free tier, on RDS
 
 | | |
 |---|---|
@@ -145,6 +164,20 @@ More than enough.
 | KMS + Secrets | $2.50 |
 | Gemini (paid, small) | $3 |
 | **Total** | **~$34** |
+
+### With the database on Hostinger
+
+| | |
+|---|---|
+| Hostinger (hosting + MySQL) | $3 |
+| Fly.io | $11 |
+| Database | **$0** |
+| KMS + Secrets | $2.50 |
+| Gemini (paid, small) | $3 |
+| **Total** | **~$19.50** |
+
+AWS is still needed — but only for KMS, which holds the encryption keys. There
+is no Hostinger equivalent, and the whole privacy design rests on it.
 
 ---
 

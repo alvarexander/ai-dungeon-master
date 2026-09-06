@@ -5,6 +5,12 @@ the backend, so you have a connection string for it.
 
 Phase 1 does not use a database at all. This is the Phase 2 path.
 
+> **There is a cheaper option worth checking first.** The MySQL included with
+> your existing Hostinger plan costs nothing extra and removes the cross-cloud
+> database problem entirely. It has two caveats that a ten-minute test settles.
+> See [DEPLOY_MYSQL_HOSTINGER.md](DEPLOY_MYSQL_HOSTINGER.md). Come back here if
+> it fails those checks, or when you outgrow shared hosting.
+
 ---
 
 ## What RDS is
