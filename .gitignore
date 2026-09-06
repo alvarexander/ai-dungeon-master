@@ -28,9 +28,29 @@ node_modules/
 
 # --- Editors and operating system junk ---
 .DS_Store
-.idea/
 .vscode/
 *.swp
+
+# --- JetBrains project files ---
+#
+# These ARE committed, so that anyone opening the project in PyCharm or
+# WebStorm gets the run configurations, the code style and the inspection
+# settings without setting them up by hand.
+#
+# The exceptions below are the per-user files. `workspace.xml` in particular
+# holds your open tabs, window layout, local run history and — the reason it
+# matters here — absolute paths containing your username. Sharing it would put
+# your home directory in a public repository and cause a merge conflict every
+# time two people opened the project.
+.idea/workspace.xml
+.idea/tasks.xml
+.idea/usage.statistics.xml
+.idea/dictionaries/
+.idea/shelf/
+.idea/httpRequests/
+.idea/dataSources.local.xml
+.idea/**/dataSources/
+.idea/.DS_Store
 
 # --- Local model caches (speech-to-text weights are large) ---
 .cache/

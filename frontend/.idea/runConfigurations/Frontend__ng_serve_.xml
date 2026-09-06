@@ -1,0 +1,20 @@
+<component name="ProjectRunConfigurationManager">
+  <!--
+    Starts the Angular development server on http://localhost:4200.
+
+    The backend must be running first, or the app loads with no cross-site
+    request forgery token. It recovers on its own now, but the first request
+    will still fail until the backend answers.
+  -->
+  <configuration default="false" name="Frontend (ng serve)" type="js.build_tools.npm">
+    <package-json value="$PROJECT_DIR$/package.json" />
+    <command value="run" />
+    <scripts>
+      <script value="start" />
+    </scripts>
+    <arguments value="-- --port 4200" />
+    <node-interpreter value="project" />
+    <envs />
+    <method v="2" />
+  </configuration>
+</component>

@@ -1,0 +1,34 @@
+<component name="ProjectRunConfigurationManager">
+  <!--
+    Starts the backend.
+
+    uvicorn is a MODULE, not a script — which is why MODULE_NAME is set rather
+    than SCRIPT_NAME. Choosing "script" in the dialogue and leaving it blank is
+    what produces "Please specify a script name".
+
+    WORKING_DIRECTORY matters: the application reads its .env relative to
+    wherever it starts, so a wrong value produces "CORS_ALLOWED_ORIGINS is
+    empty" and it refuses to boot.
+  -->
+  <configuration default="false" name="Backend (uvicorn)" type="PythonConfigurationType" factoryName="Python">
+    <module name="ai-dungeon-master-backend" />
+    <option name="ENV_FILES" value="" />
+    <envs>
+      <env name="PYTHONUNBUFFERED" value="1" />
+    </envs>
+    <option name="SDK_HOME" value="$PROJECT_DIR$/.venv/bin/python" />
+    <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
+    <option name="IS_MODULE_SDK" value="false" />
+    <option name="ADD_CONTENT_ROOTS" value="true" />
+    <option name="ADD_SOURCE_ROOTS" value="true" />
+    <option name="SCRIPT_NAME" value="" />
+    <option name="PARAMETERS" value="app.main:app --reload --port 8000" />
+    <option name="MODULE_MODE" value="true" />
+    <option name="MODULE_NAME" value="uvicorn" />
+    <option name="REDIRECT_INPUT" value="false" />
+    <option name="EMULATE_TERMINAL" value="false" />
+    <option name="SHOW_COMMAND_LINE" value="false" />
+    <option name="RUN_WITH_PTY" value="false" />
+    <method v="2" />
+  </configuration>
+</component>
