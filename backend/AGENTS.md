@@ -50,7 +50,7 @@ crosses the network. It is authoritative where this file and it disagree.
 ## Local setup
 
 ```bash
-uv sync --extra voice          # omit --extra voice if the download fails
+uv sync --all-extras          # omit --extra voice if the download fails
 cp .env.example .env           # then paste a Gemini key into it
 uv run uvicorn app.main:app --reload --port 8000
 ```

@@ -187,7 +187,7 @@ From your laptop, with your home IP temporarily whitelisted again:
 
 ```bash
 cd backend
-uv sync --extra db
+uv sync --all-extras
 DATABASE_URL="mysql+aiomysql://u123456789_dmapp:PASSWORD@YOUR_HOST:3306/u123456789_dungeon_master?ssl=true" \
   uv run python scripts/migrate.py
 ```

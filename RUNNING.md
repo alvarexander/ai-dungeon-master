@@ -60,13 +60,18 @@ the toolchain that builds the web page. Neither is part of the running product
 ### Step 2. Install the backend's libraries
 
 ```bash
-cd ~/Git/ai-dungeon-master/backend && uv sync --extra voice
+cd ~/Git/ai-dungeon-master/backend && uv sync --all-extras
 ```
 
-**What this does:** downloads the roughly twenty libraries the backend needs
-into a private folder called `.venv`, so they never collide with anything else
-on your machine. `--extra voice` additionally downloads the speech-to-text
-model libraries.
+**What this does:** downloads the libraries the backend needs into a private
+folder called `.venv`, so they never collide with anything else on your
+machine. `--all-extras` includes the optional ones: the speech-to-text
+libraries for voice input, and the MySQL libraries.
+
+> **Use `--all-extras`, not `--extra something`.** `uv sync` installs *exactly*
+> the extras you name and removes the rest — so `uv sync --extra db` silently
+> uninstalls the voice libraries, and the microphone button then reports that
+> speech-to-text is unavailable. `--all-extras` avoids the whole problem.
 
 **What you should see:** a list of packages being resolved and installed,
 ending in something like `Installed 47 packages in 2.3s`.
@@ -74,8 +79,8 @@ ending in something like `Installed 47 packages in 2.3s`.
 **How long:** the first run takes a few minutes, mostly because the voice
 libraries are several hundred megabytes. Later runs take seconds.
 
-**If it fails on the voice libraries:** drop them and carry on — typing works
-perfectly without voice input:
+**If it fails on the voice libraries:** drop the extras and carry on — typing
+works perfectly without voice input:
 
 ```bash
 cd ~/Git/ai-dungeon-master/backend && uv sync
@@ -382,7 +387,7 @@ it persists.
 | Red `Failed to fetch` in the browser | The backend is not running | Check Terminal 1 is still going |
 | Dungeon Master says the AI credentials were rejected | The Gemini key is wrong or missing | Redo step 4, then run the check script |
 | Dungeon Master says the free allowance is used up | You have hit Google's per-minute or per-day limit | Wait a minute. If it persists, the daily limit is spent and resets tomorrow. See [backend/docs/GEMINI.md](backend/docs/GEMINI.md) |
-| Voice button says speech-to-text is unavailable | The optional voice libraries are not installed | `cd backend && uv sync --extra voice`, then restart the backend |
+| Voice button says speech-to-text is unavailable | The voice libraries are missing — often because a later `uv sync --extra db` removed them | `cd backend && uv sync --all-extras`, then restart the backend |
 | A page reloads and shows a 403 error | The cross-site request forgery token was lost | Reload the page. If it repeats, restart both programs |
 
 **Whatever goes wrong, look for the correlation ID.** Every error the

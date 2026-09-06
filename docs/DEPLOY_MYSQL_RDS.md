@@ -121,7 +121,7 @@ application's, which deliberately cannot alter tables.
 # 1. Temporarily allow your own address in the security group (see below).
 # 2. Then:
 cd backend
-uv sync --extra db
+uv sync --all-extras
 DATABASE_URL="mysql+aiomysql://admin:PASSWORD@your-endpoint:3306/dungeon_master?ssl_ca=../rds-ca.pem" \
   uv run python scripts/migrate.py
 ```

@@ -154,7 +154,7 @@ instructions that build the structure — they live in `backend/migrations/` and
 run in order, once each.
 
 ```bash
-cd ~/Git/ai-dungeon-master/backend && uv sync --extra db
+cd ~/Git/ai-dungeon-master/backend && uv sync --all-extras
 ```
 
 **What this does:** installs the MySQL libraries, which are optional because
@@ -184,7 +184,7 @@ All migrations applied.
 | `Access denied for user 'dm'` | Wrong password, or the user was not created | Redo Part 2 |
 | `Unknown database 'dungeon_master'` | The `CREATE DATABASE` line did not run | Redo Part 2 |
 | `Can't connect to MySQL server` | MySQL is not running | `brew services start mysql` |
-| `Database libraries are not installed` | The extra was skipped | `uv sync --extra db` |
+| `Database libraries are not installed` | The extra was skipped | `uv sync --all-extras` |
 | `has already been applied, but its contents have changed` | A migration file was edited after running | Restore it and write a new numbered file instead |
 
 **Note `127.0.0.1` rather than `localhost`.** They usually mean the same thing,

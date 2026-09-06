@@ -30,7 +30,7 @@ Full step-by-step, written for someone who has never done it:
 The short version — two terminals:
 
 ```bash
-cd backend && uv sync --extra voice && cp .env.example .env
+cd backend && uv sync --all-extras && cp .env.example .env
 # paste a Gemini key into .env, then:
 uv run uvicorn app.main:app --reload --port 8000
 ```

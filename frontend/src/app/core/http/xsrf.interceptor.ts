@@ -38,8 +38,9 @@
  * constraint to plan for. See `backend/app/middleware/xsrf.py`.
  */
 
-import { HttpInterceptorFn } from '@angular/common/http';
+import { HttpInterceptorFn, HttpRequest } from '@angular/common/http';
 import { inject } from '@angular/core';
+import { Observable, catchError, from, switchMap, throwError } from 'rxjs';
 
 import { APP_CONFIG } from '../app-config';
 
@@ -80,6 +81,51 @@ export function readCookie(name: string): string | null {
  * @param next Passes the request on to the next interceptor.
  * @returns The response stream.
  */
+/**
+ * Ask the backend for a fresh token, which arrives as a cookie.
+ *
+ * Uses `fetch` rather than Angular's `HttpClient` on purpose: an HttpClient
+ * call from inside an interceptor would pass back through the interceptor
+ * chain, and a token refresh triggering another token refresh is an easy way
+ * to build an infinite loop.
+ *
+ * @param apiBaseUrl Where the backend lives.
+ * @returns The new token, or `null` if it could not be obtained.
+ */
+async function refreshToken(apiBaseUrl: string): Promise<string | null> {
+  try {
+    await fetch(`${apiBaseUrl}/api/v1/auth/csrf`, {
+      credentials: 'include',
+      cache: 'no-store',
+    });
+  } catch {
+    return null;
+  }
+  return readCookie(XSRF_COOKIE_NAME);
+}
+
+/**
+ * Decide whether a failure was the cross-site request forgery check.
+ *
+ * @param error Whatever the request stream threw.
+ * @returns True if this is a token failure worth retrying once.
+ */
+export function isXsrfFailure(error: unknown): boolean {
+  const failure = (error as { failure?: { code?: string; status?: number } })?.failure;
+  return failure?.code === 'xsrf_failed' || failure?.status === 403;
+}
+
+/**
+ * Attach the token to a request.
+ *
+ * @param request The request to copy.
+ * @param token The token to attach.
+ * @returns A copy carrying the header.
+ */
+function withToken<T>(request: HttpRequest<T>, token: string): HttpRequest<T> {
+  return request.clone({ setHeaders: { [XSRF_HEADER_NAME]: token } });
+}
+
 export const xsrfInterceptor: HttpInterceptorFn = (request, next) => {
   const config = inject(APP_CONFIG);
 
@@ -90,19 +136,56 @@ export const xsrfInterceptor: HttpInterceptorFn = (request, next) => {
     return next(request);
   }
 
+  /**
+   * Fetch a fresh token and try the request once more.
+   *
+   * Why this exists: the token is obtained when the application starts. If the
+   * backend was not running at that moment — which happens constantly during
+   * development, because the two servers are started separately — the app ends
+   * up with no token, and every save fails until the page is reloaded.
+   *
+   * Reloading is a poor thing to ask of somebody mid-sentence. Retrying once is
+   * the same fix applied automatically.
+   *
+   * @param error The original failure, rethrown if the retry is not possible.
+   * @returns The retried response stream, or the original error.
+   */
+  const retryWithFreshToken = (error: unknown): Observable<unknown> => {
+    if (!isXsrfFailure(error)) {
+      return throwError(() => error);
+    }
+    return from(refreshToken(config.apiBaseUrl)).pipe(
+      switchMap((fresh) => {
+        if (!fresh) {
+          // Could not get a token. Rethrow the original failure, which carries
+          // the correlation identifier and a message worth showing.
+          return throwError(() => error);
+        }
+        // No further catchError here, so this can only ever happen once.
+        return next(withToken(request, fresh));
+      }),
+    );
+  };
+
   const token = readCookie(XSRF_COOKIE_NAME);
   if (!token) {
     // Deliberately allowed through rather than blocked here. The backend will
     // refuse it with a clear 403, which is more useful than a silent failure
     // in the browser — and this warning names the likely cause.
     console.warn(
-      `[xsrf] No ${XSRF_COOKIE_NAME} cookie found, so this ${request.method} request ` +
-        'will be refused by the server. If this happens in production, the API and the ' +
-        'app are probably not under a shared parent domain — see COOKIE_DOMAIN in the ' +
+      `[xsrf] No ${XSRF_COOKIE_NAME} cookie yet — fetching one before this ` +
+        `${request.method} request. If this repeats in production, the API and the app ` +
+        'are probably not under a shared parent domain; see COOKIE_DOMAIN in the ' +
         "backend's configuration.",
     );
-    return next(request);
+    // No token at all — go straight to fetching one rather than making a
+    // request that is certain to be refused.
+    return from(refreshToken(config.apiBaseUrl)).pipe(
+      switchMap((fresh) => next(fresh ? withToken(request, fresh) : request)),
+    ) as ReturnType<HttpInterceptorFn>;
   }
 
-  return next(request.clone({ setHeaders: { [XSRF_HEADER_NAME]: token } }));
+  return next(withToken(request, token)).pipe(
+    catchError(retryWithFreshToken),
+  ) as ReturnType<HttpInterceptorFn>;
 };

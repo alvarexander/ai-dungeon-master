@@ -187,7 +187,7 @@ continue** if an applied file has changed.
 ### Running them
 
 ```bash
-cd backend && uv sync --extra db
+cd backend && uv sync --all-extras
 DATABASE_URL="mysql+aiomysql://dm:PASSWORD@127.0.0.1:3306/dungeon_master" \
   uv run python scripts/migrate.py
 ```
