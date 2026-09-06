@@ -7,7 +7,7 @@
  * `SpeechService.setVoice`.
  */
 
-import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
 import { UserSettings } from '../../core/api/api.types';
@@ -145,7 +145,43 @@ import { Icon } from '../../shared/ui/icon';
                         </span>
                     </label>
 
-                    <button type="button" class="btn btn--sm" (click)="speech.preview()">
+                    <label class="field volume">
+                        <span class="field__label">
+                            How loud
+                            <span class="volume__readout mono">{{ volumePercent() }}%</span>
+                        </span>
+                        <div class="volume__row">
+                            <app-icon [name]="speech.muted() ? 'volume_off' : 'volume_up'" [size]="18" />
+                            <input
+                                type="range"
+                                class="range"
+                                min="0"
+                                max="100"
+                                step="5"
+                                [value]="volumePercent()"
+                                (input)="chooseVolume($event)"
+                                aria-label="Narration volume"
+                            />
+                        </div>
+                        <span class="field__hint">
+                            @if (speech.muted()) {
+                                <strong>Turned all the way down.</strong> The Dungeon Master will not read anything
+                                aloud, and hands-free play will not wait for it to finish. The replies still arrive as
+                                text exactly as before.
+                            } @else {
+                                Remembered on this device rather than on your account, because headphones and laptop
+                                speakers want very different settings.
+                            }
+                        </span>
+                    </label>
+
+                    <button
+                        type="button"
+                        class="btn btn--sm"
+                        (click)="speech.preview()"
+                        [disabled]="speech.muted()"
+                        [title]="speech.muted() ? 'Turn the volume up to hear the voice' : ''"
+                    >
                         <app-icon name="volume_up" [size]="16" />
                         Hear this voice
                     </button>
@@ -246,6 +282,19 @@ import { Icon } from '../../shared/ui/icon';
             .toggle span span {
                 display: block;
             }
+            .volume {
+                margin-top: var(--space-3);
+            }
+            .volume__row {
+                display: flex;
+                align-items: center;
+                gap: var(--space-3);
+            }
+            .volume__readout {
+                float: right;
+                color: var(--ink-muted);
+                font-weight: 400;
+            }
             .voice-tip {
                 margin: var(--space-3) 0 0;
                 padding: var(--space-3);
@@ -274,9 +323,30 @@ export class SettingsPage {
     }
 
     /**
-     * Remember which voice the Dungeon Master should use.
+     * Set how loud the narration is.
      *
-     * @param event The change event from the voice dropdown.
+     * @param event The input event from the volume slider.
+     * @returns Nothing.
+     */
+    chooseVolume(event: Event): void {
+        this.speech.setVolume(Number((event.target as HTMLInputElement).value) / 100);
+    }
+
+    /**
+     * The volume as a whole percentage, for the slider and its readout.
+     *
+     * The slider works in percent because "70%" means something to a reader and
+     * "0.7" does not; the service stores the fraction the browser's speech API
+     * actually wants.
+     *
+     * @returns A number from 0 to 100.
+     */
+    readonly volumePercent = computed(() => Math.round(this.speech.volume() * 100));
+
+    /**
+     * Choose which voice to use.
+     *
+     * @param event The change event from the select.
      * @returns Nothing.
      */
     chooseVoice(event: Event): void {

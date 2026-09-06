@@ -41,6 +41,30 @@
                     }
                 </div>
 
+                <!--
+          A shortcut to the narration setting, for deciding mid-scene that you
+          would rather read than listen. Shown whenever the browser can speak
+          at all, not only when it currently is — a switch that vanishes when
+          you turn it off cannot be turned back on.
+        -->
+                @if (speech.isSupported()) {
+                    <button
+                        type="button"
+                        class="chip chip--toggle"
+                        [class.chip--on]="speechAvailable()"
+                        (click)="toggleNarration()"
+                        [attr.aria-pressed]="speechAvailable()"
+                        [title]="
+                            speechAvailable()
+                                ? 'Stop the Dungeon Master reading aloud'
+                                : 'Have the Dungeon Master read aloud'
+                        "
+                    >
+                        <app-icon [name]="speechAvailable() ? 'volume_up' : 'volume_off'" [size]="14" />
+                        {{ speechAvailable() ? 'Reading aloud' : 'Text only' }}
+                    </button>
+                }
+
                 @if (conversationalAvailable()) {
                     <button type="button" class="handsfree-invite" (click)="toggleConversational()">
                         <app-icon name="forum" [size]="18" />

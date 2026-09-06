@@ -214,6 +214,32 @@ export class ChatPage {
      *
      * @returns Nothing.
      */
+    /**
+     * Turn the Dungeon Master's narration on or off from the play screen.
+     *
+     * The same setting as the one in Settings, deliberately — this is a
+     * shortcut to it, not a second switch that could disagree with it. Somebody
+     * who wants to read rather than listen usually decides that mid-scene, and
+     * making them leave the game to act on it is the kind of friction that ends
+     * with the sound left on and the tab closed.
+     *
+     * Silencing it also ends hands-free play, which has nothing to wait for
+     * once the narration has stopped.
+     *
+     * @returns Nothing.
+     */
+    toggleNarration(): void {
+        const wanted = !this.speechAvailable();
+
+        if (!wanted) {
+            this.speech.stop();
+            this.speakingId.set(null);
+            this.conversational.set(false);
+        }
+
+        void this.settings.update({ voice_output_enabled: wanted });
+    }
+
     async toggleConversational(): Promise<void> {
         if (this.conversational()) {
             this.conversational.set(false);

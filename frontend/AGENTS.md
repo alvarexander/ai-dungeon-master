@@ -49,7 +49,7 @@ npm start                 # http://localhost:4200
 ```
 
 ```bash
-npm test                  # 52 tests, vitest
+npm test                  # 58 tests, vitest
 npm run build             # production build into dist/ai-dungeon-master/browser
 
 npm run lint              # ESLint

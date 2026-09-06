@@ -132,7 +132,7 @@ afternoon:
 
 ```bash
 cd backend  && uv run pytest    # 90
-cd frontend && npm test         # 52
+cd frontend && npm test         # 58
 ```
 
 The frontend suite runs entirely without a browser, including the tests for the

@@ -171,6 +171,9 @@ function forSpeech(text: string): string {
 /** Where the chosen voice is remembered. Per device, deliberately. */
 const VOICE_STORAGE_KEY = 'dm.voice';
 
+/** Where the loudness is remembered. Also per device — see {@link SpeechService.setVolume}. */
+const VOLUME_STORAGE_KEY = 'dm.volume';
+
 /**
  * Read the remembered voice, tolerating browsers that forbid storage.
  *
@@ -184,11 +187,36 @@ function readStoredVoice(): string {
     }
 }
 
+/**
+ * Read the remembered loudness, tolerating browsers that forbid storage.
+ *
+ * @returns A number from 0 to 1. Full volume when nothing is stored, or when
+ *   what is stored is not a number a slider could have produced.
+ */
+function readStoredVolume(): number {
+    try {
+        const stored = localStorage.getItem(VOLUME_STORAGE_KEY);
+        // The emptiness check has to come first, and it has to cover both
+        // cases. `Number(null)` and `Number('')` are both 0 rather than NaN, so
+        // a range test alone reads "nothing stored" as "turned all the way
+        // down" — silencing the narrator for everyone who has never touched the
+        // slider, with no error to show for it.
+        if (stored === null || stored.trim() === '') {
+            return 1;
+        }
+        const value = Number(stored);
+        return Number.isFinite(value) && value >= 0 && value <= 1 ? value : 1;
+    } catch {
+        return 1;
+    }
+}
+
 @Injectable({ providedIn: 'root' })
 export class SpeechService {
     private readonly _speaking = signal(false);
     private readonly _voices = signal<SpeechSynthesisVoice[]>([]);
     private readonly _voiceName = signal<string>(readStoredVoice());
+    private readonly _volume = signal<number>(readStoredVolume());
 
     /** True while the Dungeon Master is talking. */
     readonly speaking = this._speaking.asReadonly();
@@ -198,6 +226,18 @@ export class SpeechService {
 
     /** The chosen voice's name, or empty for the automatic choice. */
     readonly voiceName = this._voiceName.asReadonly();
+
+    /** How loud the narration is, from 0 (silent) to 1 (full). */
+    readonly volume = this._volume.asReadonly();
+
+    /**
+     * True when the slider has been dragged all the way down.
+     *
+     * Worth naming, because silence is a state the interface has to explain.
+     * A narrator that has simply stopped working and one that has been turned
+     * down to nothing look identical otherwise.
+     */
+    readonly muted = computed(() => this._volume() === 0);
 
     /** True when this browser can speak at all. */
     readonly isSupported = computed(() => typeof window !== 'undefined' && 'speechSynthesis' in window);
@@ -314,6 +354,42 @@ export class SpeechService {
     }
 
     /**
+     * Set how loud the narration is.
+     *
+     * WHY THIS IS STORED IN THE BROWSER AND NOT ON THE ACCOUNT
+     *
+     * The same reasoning as the voice choice above. Loudness is a property of
+     * the machine you are sitting at — laptop speakers in a quiet room and
+     * headphones on a train want very different settings — so carrying one
+     * number between devices would be actively unhelpful.
+     *
+     * The on/off toggle *is* on the account, because "I do not want to be read
+     * to" is a preference about the person rather than the hardware.
+     *
+     * @param value How loud, from 0 to 1. Anything outside that range is
+     *   brought into it rather than rejected, since a slider cannot produce it
+     *   but a caller might.
+     * @returns Nothing.
+     */
+    setVolume(value: number): void {
+        const clamped = Math.min(1, Math.max(0, Number.isFinite(value) ? value : 1));
+        this._volume.set(clamped);
+
+        // Silence takes effect at once. Waiting for the current paragraph to
+        // finish would make the slider feel broken.
+        if (clamped === 0) {
+            this.stop();
+        }
+
+        try {
+            localStorage.setItem(VOLUME_STORAGE_KEY, String(clamped));
+        } catch {
+            // Private browsing, or storage disabled. The setting then lasts for
+            // this session only, which is a small loss rather than a failure.
+        }
+    }
+
+    /**
      * Read a passage aloud.
      *
      * @param text What to say.
@@ -327,6 +403,15 @@ export class SpeechService {
      */
     speak(text: string, options: { rate?: number; onEnd?: () => void } = {}): void {
         if (!this.isSupported() || !text.trim()) {
+            options.onEnd?.();
+            return;
+        }
+
+        // Turned all the way down. Speaking at zero volume is not silence — it
+        // is a silence that still takes thirty seconds, during which the
+        // interface says "Reading aloud" and hands-free mode refuses to listen.
+        // Finishing immediately is what the player actually asked for.
+        if (this._volume() === 0) {
             options.onEnd?.();
             return;
         }
@@ -362,6 +447,7 @@ export class SpeechService {
             // A fraction below default. Synthesised voices tend to sit high, which
             // is part of what reads as "robotic"; dropping it a little warms them up.
             utterance.pitch = 0.95;
+            utterance.volume = this._volume();
 
             if (index === sentences.length - 1) {
                 utterance.onend = () => {

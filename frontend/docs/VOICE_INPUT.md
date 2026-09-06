@@ -178,6 +178,61 @@ words.
 
 ---
 
+## The Dungeon Master speaking back
+
+Narration is read aloud by the voice built into the browser
+(`SpeechSynthesis`), so **nothing is sent anywhere to produce the audio** — the
+text has already been to Google to be written, and speaking it adds no new
+disclosure. That is the opposite of the situation with the microphone, and it
+is why this direction needs no defending.
+
+### Turning it off
+
+Two controls, because they answer two different questions.
+
+**"Do I want to be read to at all?"** is a toggle, in Settings and repeated as a
+chip on the play screen. It is saved **to the account**, so it follows the
+person between devices — a preference about them, not about their hardware. The
+chip is a shortcut to the same setting rather than a second switch, because two
+switches that can disagree is a bug waiting to happen. It appears whenever the
+browser can speak at all, not only when it currently is: a control that
+disappears when you turn it off cannot be turned back on.
+
+Switching it off also ends hands-free play, which has nothing left to wait for.
+
+**"How loud?"** is a slider, in Settings, saved **to the device**. The same
+reasoning as the voice choice above: headphones on a train and laptop speakers
+in a quiet room want very different settings, so carrying one number between
+machines would be actively unhelpful.
+
+### Zero is not the same as quiet
+
+Dragging the slider to nothing does not speak at zero volume — it skips
+speaking entirely and reports itself finished at once.
+
+Speaking silently would still take the full thirty seconds, during which the
+status line claims to be reading aloud and hands-free mode refuses to listen
+because it is waiting for narration that cannot be heard. Finishing immediately
+is what the player actually asked for.
+
+### A trap worth knowing about
+
+`readStoredVolume` reads the slider's saved value, and the obvious way to write
+it is wrong:
+
+```ts
+const stored = Number(localStorage.getItem(KEY)); // wrong
+return Number.isFinite(stored) && stored >= 0 && stored <= 1 ? stored : 1;
+```
+
+**`Number(null)` is 0, and so is `Number('')`** — neither is `NaN`. The range
+check therefore accepts "nothing has ever been stored" as "turned all the way
+down", and the narrator is silent for every new user, with no error to show for
+it. Emptiness has to be checked before the conversion. There are tests for both
+cases in `speech.spec.ts`, and both were written because the bug happened.
+
+---
+
 ## If speech-to-text is unavailable
 
 The libraries are an optional install (`uv sync --extra voice`) because they

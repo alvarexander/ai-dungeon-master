@@ -27,7 +27,7 @@ The general rule: **mock the boundary, test everything inside it.**
 
 ---
 
-## What the 52 tests prove
+## What the 58 tests prove
 
 ### `xsrf.interceptor.spec.ts`
 
@@ -67,6 +67,26 @@ configuration problem.
 - **Scrubbing is surfaced**, so the player can see something was removed before
   their words were sent to Google.
 - Changing campaign clears the conversation.
+
+### `speech.spec.ts`
+
+The narration volume, and it exists because of a real bug rather than a hunch.
+
+The first version read the stored volume with `Number(localStorage.getItem(key))`
+and then checked the result was between 0 and 1 — which looks careful and is
+wrong, because `Number(null)` is 0 rather than `NaN`. Nothing stored therefore
+read as "turned all the way down", and the Dungeon Master was silent for every
+user who had never touched the slider. `Number('')` is 0 too, and the test
+caught that second case after the first was fixed.
+
+- **A new user hears the narration.** The regression, pinned down directly.
+- A stored zero is honoured, because that is a real choice rather than an
+  absent one — the two must be told apart.
+- Nonsense in storage falls back to full volume rather than being trusted.
+- Out-of-range values are brought into range rather than rejected.
+
+Silence is a hard failure to notice: nothing throws, and the feature simply
+appears not to exist.
 
 ### `dice.spec.ts`
 
