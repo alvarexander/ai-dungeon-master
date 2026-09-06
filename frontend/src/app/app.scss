@@ -1,168 +1,304 @@
 :host {
-  display: flex;
-  flex-direction: column;
-  min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
 }
 
 /* Hidden until focused by keyboard, then clearly visible. The first thing in
    the page, so keyboard users can bypass the navigation on every screen. */
 .skip-link {
-  position: absolute;
-  left: -9999px;
-  z-index: 100;
-  padding: 10px 16px;
-  background: var(--accent);
-  color: var(--accent-ink);
-  border-radius: 0 0 var(--radius) 0;
-  font-weight: 600;
+    position: absolute;
+    left: -9999px;
+    z-index: 100;
+    padding: 10px 16px;
+    background: var(--accent);
+    color: var(--accent-ink);
+    border-radius: 0 0 var(--radius) 0;
+    font-weight: 600;
 
-  &:focus {
-    left: 0;
-    top: 0;
-  }
+    &:focus {
+        left: 0;
+        top: 0;
+    }
 }
 
 .shell-header {
-  position: sticky;
-  top: 0;
-  z-index: 20;
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
 
-  &__inner {
-    display: flex;
-    align-items: center;
-    gap: var(--space-4);
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: var(--space-3) var(--space-5);
-  }
+    &__inner {
+        display: flex;
+        align-items: center;
+        gap: var(--space-4);
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: var(--space-3) var(--space-5);
+    }
 }
 
 .brand {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  color: var(--ink);
-  text-decoration: none;
-  font-weight: 600;
-  white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    color: var(--ink);
+    text-decoration: none;
+    font-weight: 600;
+    white-space: nowrap;
 
-  &__mark {
-    color: var(--accent);
-    font-size: 1.1rem;
-  }
+    /* The die turns a little when the header is hovered — a small sign that
+     the whole thing is a link home, and a nod to what it is a picture of. */
+    &__mark {
+        transition: transform 420ms cubic-bezier(0.22, 1.2, 0.36, 1);
+    }
+
+    &:hover &__mark {
+        transform: rotate(-24deg) scale(1.06);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .brand__mark,
+    .brand:hover .brand__mark {
+        transition: none;
+        transform: none;
+    }
 }
 
 .menu-toggle {
-  display: none;
-  margin-left: auto;
-  padding: 8px 12px;
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius);
-  background: var(--surface-raised);
-  color: var(--ink);
-  font-size: 1.1rem;
-  cursor: pointer;
+    display: none;
+    margin-left: auto;
+    padding: 8px 12px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius);
+    background: var(--surface-raised);
+    color: var(--ink);
+    font-size: 1.1rem;
+    cursor: pointer;
 }
 
 .shell-nav {
-  display: flex;
-  align-items: center;
-  gap: var(--space-4);
-  flex: 1;
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+    flex: 1;
 
-  a {
-    color: var(--ink-muted);
-    text-decoration: none;
-    padding: 6px 2px;
-    border-bottom: 2px solid transparent;
-    transition: color var(--transition), border-color var(--transition);
+    a {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        color: var(--ink-muted);
+        text-decoration: none;
+        padding: 6px 2px;
+        border-bottom: 2px solid transparent;
+        transition:
+            color var(--transition),
+            border-color var(--transition);
 
-    &:hover { color: var(--ink); }
+        &:hover {
+            color: var(--ink);
+        }
 
-    /* `routerLinkActive` adds this to whichever link matches the current
+        /* The icon lifts very slightly on hover and on the current page. It is
+       a small thing, but it makes the row feel like it is responding rather
+       than just changing colour. */
+        app-icon {
+            opacity: 0.75;
+            transition:
+                opacity var(--transition),
+                transform var(--transition);
+        }
+
+        &:hover app-icon,
+        &.is-active app-icon {
+            opacity: 1;
+            transform: translateY(-1px);
+        }
+
+        /* `routerLinkActive` adds this to whichever link matches the current
        address, so people can see where they are. */
-    &.is-active {
-      color: var(--accent-strong);
-      border-bottom-color: var(--accent);
+        &.is-active {
+            color: var(--accent-strong);
+            border-bottom-color: var(--accent);
+        }
     }
-  }
 
-  &__user {
-    color: var(--ink-muted);
-    font-size: 0.9rem;
-  }
+    &__user {
+        color: var(--ink-muted);
+        font-size: 0.9rem;
+    }
 }
 
 .btn--sm {
-  padding: 5px 12px;
-  font-size: 0.85rem;
+    padding: 5px 12px;
+    font-size: 0.85rem;
 }
 
 .demo-strip {
-  margin: 0;
-  padding: 8px var(--space-5);
-  background: var(--warning-bg);
-  border-top: 1px solid var(--warning);
-  color: var(--ink);
-  font-size: 0.85rem;
-  text-align: center;
+    margin: 0;
+    padding: 8px var(--space-5);
+    background: var(--warning-bg);
+    border-top: 1px solid var(--warning);
+    color: var(--ink);
+    font-size: 0.85rem;
+    text-align: center;
 
-  strong { color: var(--warning); }
-  a { color: var(--warning); }
+    strong {
+        color: var(--warning);
+    }
+    a {
+        color: var(--warning);
+    }
 }
 
 .shell-main {
-  flex: 1;
-  /* Removes the focus ring that would otherwise appear when the skip link
+    flex: 1;
+    /* Removes the focus ring that would otherwise appear when the skip link
      sends focus here — the outline on a whole page is meaningless, and the
      page scrolling into view already shows what happened. */
-  outline: none;
+    outline: none;
 }
 
 .shell-footer {
-  border-top: 1px solid var(--border);
-  padding: var(--space-4) var(--space-5);
-  text-align: center;
+    border-top: 1px solid var(--border);
+    padding: var(--space-4) var(--space-5);
+    text-align: center;
 
-  p { margin: 0; max-width: 70ch; margin-inline: auto; }
+    p {
+        margin: 0;
+        max-width: 70ch;
+        margin-inline: auto;
+    }
 }
 
 /* Below 820px the navigation collapses behind a button. The breakpoint is
    where the links stop fitting, rather than a device size — device widths
    change, and the point at which a layout breaks does not. */
 @media (max-width: 820px) {
-  .menu-toggle { display: block; }
-
-  .shell-nav {
-    display: none;
-    position: absolute;
-    top: 100%;
-    left: 0;
-    right: 0;
-    flex-direction: column;
-    align-items: stretch;
-    gap: var(--space-1);
-    padding: var(--space-4) var(--space-5);
-    background: var(--surface);
-    border-bottom: 1px solid var(--border);
-    box-shadow: var(--shadow-lg);
-
-    &--open { display: flex; }
-
-    a {
-      padding: 10px 0;
-      border-bottom: 1px solid var(--border);
-      border-left: 2px solid transparent;
-
-      &.is-active {
-        border-bottom-color: var(--border);
-        border-left-color: var(--accent);
-        padding-left: 10px;
-      }
+    .menu-toggle {
+        display: block;
     }
 
-    .spacer { display: none; }
-  }
+    /*
+    The menu panel is always present and always laid out; it is hidden by
+    being transparent and shifted upwards rather than by `display: none`.
+
+    That is deliberate. `display` cannot be animated — a panel switching from
+    `none` to `flex` appears instantly, however long a transition is set — so
+    anything that needs to slide has to stay in the box model and hide some
+    other way. `visibility` is what keeps a closed menu out of reach of the
+    keyboard and of screen readers, and its transition is delayed until the
+    fade has finished so the panel does not vanish halfway through.
+  */
+    .shell-nav {
+        display: flex;
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        flex-direction: column;
+        align-items: stretch;
+        gap: var(--space-1);
+        padding: var(--space-4) var(--space-5);
+        background: var(--surface);
+        border-bottom: 1px solid var(--border);
+        box-shadow: var(--shadow-lg);
+
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+        transform: translateY(-10px);
+        /* The curve overshoots very slightly at the end, which is what makes
+       the panel feel like it drops into place rather than arriving. */
+        transition:
+            opacity 200ms ease,
+            transform 260ms cubic-bezier(0.22, 1.2, 0.36, 1),
+            visibility 0s linear 260ms;
+
+        &--open {
+            opacity: 1;
+            visibility: visible;
+            pointer-events: auto;
+            transform: translateY(0);
+            transition-delay: 0s, 0s, 0s;
+        }
+
+        a {
+            padding: 10px 0;
+            gap: 12px;
+            border-bottom: 1px solid var(--border);
+            border-left: 2px solid transparent;
+
+            &.is-active {
+                border-bottom-color: var(--border);
+                border-left-color: var(--accent);
+                padding-left: 10px;
+            }
+        }
+
+        /*
+      The rows arrive one after another rather than all at once. A tenth of a
+      second between them is enough to read as a sequence and short enough
+      that nobody is waiting for the last one.
+    */
+        &--open > * {
+            animation: nav-row-in 300ms cubic-bezier(0.22, 1.1, 0.36, 1) backwards;
+        }
+
+        &--open > :nth-child(1) {
+            animation-delay: 30ms;
+        }
+        &--open > :nth-child(2) {
+            animation-delay: 60ms;
+        }
+        &--open > :nth-child(3) {
+            animation-delay: 90ms;
+        }
+        &--open > :nth-child(4) {
+            animation-delay: 120ms;
+        }
+        &--open > :nth-child(5) {
+            animation-delay: 150ms;
+        }
+        &--open > :nth-child(n + 6) {
+            animation-delay: 180ms;
+        }
+
+        .spacer {
+            display: none;
+        }
+    }
+}
+
+@keyframes nav-row-in {
+    from {
+        opacity: 0;
+        transform: translateX(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+/* The menu button's icon turns as it swaps between the bars and the cross, so
+   the two states feel like one control changing rather than two icons. */
+.menu-toggle app-icon {
+    transition: transform 260ms cubic-bezier(0.22, 1.2, 0.36, 1);
+}
+
+.menu-toggle[aria-expanded='true'] app-icon {
+    transform: rotate(90deg);
+}
+
+/* Someone who has asked for less motion still gets the menu; it simply
+   appears rather than sliding. */
+@media (prefers-reduced-motion: reduce) {
+    .shell-nav,
+    .shell-nav--open > * {
+        transition-duration: 1ms;
+        animation: none;
+    }
 }

@@ -1,0 +1,47 @@
+<!--
+  The application mark: a twenty-sided die, seen straight down one of its faces.
+
+  Why a d20: it is the emblem of the whole hobby. It is the die the fifth
+  edition rules ask for by default, the one every check and attack is rolled
+  with, and the shape a player recognises before they have read a word.
+
+  Why it has no number on it: at the size a browser tab shows this — sixteen
+  pixels across — a "20" would be about three pixels tall and unreadable, and
+  putting real text in an icon would mean depending on a font that may not be
+  installed. The faceted outline reads at every size and needs nothing.
+
+  The geometry is not drawn by eye. Viewed down a face, an icosahedron's
+  outline is a perfect regular hexagon divided into ten triangles, and these
+  are those ten triangles, computed from the corners of the solid — the same
+  arithmetic as `src/app/core/dice/polyhedra.ts`. The facets are tinted by how
+  squarely each one faces a light above and to the left, which is what gives a
+  flat drawing its depth.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="AI Dungeon Master">
+    <title>AI Dungeon Master</title>
+
+    <!-- A dark rounded ground, so the mark holds together on a pale browser tab. -->
+    <rect width="128" height="128" rx="26" fill="#12141a" />
+
+    <g stroke="#3a2a0e" stroke-width="1.4" stroke-linejoin="round">
+        <polygon points="39.38,78.21 88.62,78.21 64.00,35.57" fill="#f5cc78" />
+        <polygon points="64.00,110.00 88.62,78.21 39.38,78.21" fill="#6b4a17" />
+        <polygon points="39.38,78.21 64.00,35.57 24.16,41.00" fill="#e0b455" />
+        <polygon points="88.62,78.21 103.84,41.00 64.00,35.57" fill="#b8862f" />
+        <polygon points="64.00,110.00 39.38,78.21 24.16,87.00" fill="#6b4a17" />
+        <polygon points="24.16,87.00 39.38,78.21 24.16,41.00" fill="#b8862f" />
+        <polygon points="64.00,110.00 103.84,87.00 88.62,78.21" fill="#5c3f13" />
+        <polygon points="24.16,41.00 64.00,35.57 64.00,18.00" fill="#f0c164" />
+        <polygon points="88.62,78.21 103.84,87.00 103.84,41.00" fill="#5c3f13" />
+        <polygon points="64.00,35.57 103.84,41.00 64.00,18.00" fill="#d9a441" />
+    </g>
+
+    <!-- The silhouette, drawn last so the outline stays crisp over the facets. -->
+    <polygon
+        points="64,18 103.84,41 103.84,87 64,110 24.16,87 24.16,41"
+        fill="none"
+        stroke="#f5cc78"
+        stroke-width="2.6"
+        stroke-linejoin="round"
+    />
+</svg>

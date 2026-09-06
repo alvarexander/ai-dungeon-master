@@ -27,19 +27,19 @@ is not implemented and what genuinely is.
 
 ### Which screens are which
 
-| Screen | Status | What is real |
-|---|---|---|
-| Play (chat) | **Fully working** | Everything, including the AI |
-| Campaigns | **Fully working** | Real create, list, delete, real encryption |
-| Characters | **Fully working** | Real sheets, hit point arithmetic, encryption |
-| Settings | **Fully working** | Real preferences, saved to the backend |
-| Account — details, activity | **Fully working** | Reads the real profile |
-| Account — deletion | **Fully working** | Genuinely destroys the encryption key |
-| Your data (privacy) | **Fully working** | Static content, but true |
-| Sign in | **Stubbed session** | Argon2id password check, encrypted email lookup, rate limiting are all real. The *token* is not |
-| Sign up | **Stubbed session** | Registration genuinely creates an encrypted account |
-| Forgot password | **Fully stubbed** | Nothing is sent; needs email delivery |
-| Account — change password/email | **Fully stubbed** | Same reason |
+| Screen                          | Status              | What is real                                                                                    |
+| ------------------------------- | ------------------- | ----------------------------------------------------------------------------------------------- |
+| Play (chat)                     | **Fully working**   | Everything, including the AI                                                                    |
+| Campaigns                       | **Fully working**   | Real create, list, delete, real encryption                                                      |
+| Characters                      | **Fully working**   | Real sheets, hit point arithmetic, encryption                                                   |
+| Settings                        | **Fully working**   | Real preferences, saved to the backend                                                          |
+| Account — details, activity     | **Fully working**   | Reads the real profile                                                                          |
+| Account — deletion              | **Fully working**   | Genuinely destroys the encryption key                                                           |
+| Your data (privacy)             | **Fully working**   | Static content, but true                                                                        |
+| Sign in                         | **Stubbed session** | Argon2id password check, encrypted email lookup, rate limiting are all real. The _token_ is not |
+| Sign up                         | **Stubbed session** | Registration genuinely creates an encrypted account                                             |
+| Forgot password                 | **Fully stubbed**   | Nothing is sent; needs email delivery                                                           |
+| Account — change password/email | **Fully stubbed**   | Same reason                                                                                     |
 
 **If you make a stubbed screen real, remove its `<app-stub-notice>` in the same
 commit.** A stale warning trains people to ignore warnings.
@@ -55,19 +55,19 @@ theme.
 
 ### Colour
 
-| Token | For |
-|---|---|
-| `--bg` | The page behind everything |
-| `--surface` | Cards and panels |
-| `--surface-raised` | Something sitting on a card |
-| `--surface-sunken` | Inputs, wells |
-| `--ink` | Body text |
-| `--ink-muted` | Supporting text |
-| `--ink-faint` | Labels, placeholders |
-| `--accent` | Old gold — the one brand colour |
-| `--danger` / `--success` / `--warning` / `--info` | Meaning |
-| `--border` / `--border-strong` | Dividers and outlines |
-| `--focus` | The focus ring. Never override this |
+| Token                                             | For                                 |
+| ------------------------------------------------- | ----------------------------------- |
+| `--bg`                                            | The page behind everything          |
+| `--surface`                                       | Cards and panels                    |
+| `--surface-raised`                                | Something sitting on a card         |
+| `--surface-sunken`                                | Inputs, wells                       |
+| `--ink`                                           | Body text                           |
+| `--ink-muted`                                     | Supporting text                     |
+| `--ink-faint`                                     | Labels, placeholders                |
+| `--accent`                                        | Old gold — the one brand colour     |
+| `--danger` / `--success` / `--warning` / `--info` | Meaning                             |
+| `--border` / `--border-strong`                    | Dividers and outlines               |
+| `--focus`                                         | The focus ring. Never override this |
 
 Every foreground and background pair meets the WCAG AA contrast ratio of 4.5:1
 for body text, in both themes.
@@ -100,7 +100,7 @@ Every message in the application. Four kinds: `info`, `warning`, `danger`,
 
 ```html
 <app-banner kind="danger" title="That did not work">
-  <p>{{ message }}</p>
+    <p>{{ message }}</p>
 </app-banner>
 ```
 
@@ -112,6 +112,49 @@ one component rather than repeated styling:
 - **An icon alongside the colour.** Roughly one man in twelve cannot reliably
   distinguish red from green, so colour never carries meaning alone.
 
+### `<app-icon>`
+
+Google Material Symbols, drawn inline as SVG. `<app-icon name="mic" [size]="20"
+label="Start recording" />`.
+
+**They are inline rather than loaded as a font from Google.** The usual way to
+use Material icons is a stylesheet link to `fonts.googleapis.com`, which costs
+three things this project would rather not pay: a third-party request carrying
+the user's address before they have done anything, icons that arrive late or as
+empty squares on a slow connection, and nothing at all when the wifi at the
+table is patchy. The paths are embedded instead. Material Symbols are published
+under the Apache License 2.0, which permits this.
+
+Leave `label` empty when the icon sits beside text that already says the same
+thing — a screen reader announcing "send send" is worse than silence. Set it
+when the icon is the only label, as on an icon-only button.
+
+To add one: find it at fonts.google.com/icons, copy the path data from the 24px
+outlined variant, and add an entry to `ICONS` in `shared/ui/icon.ts`.
+
+### `<app-logo>`
+
+The application mark: a twenty-sided die, seen straight down one of its faces.
+
+A d20 because it is the emblem of the hobby — the die the rules ask for by
+default, and the shape a player recognises before reading a word.
+
+**It carries no number.** The obvious thing is a "20" on the front face, but at
+the size this appears — beside the wordmark, and sixteen pixels across in a
+browser tab — that would be a smudge, and drawing real text would mean
+depending on a font that may not be installed.
+
+**The shape is computed, not drawn.** Seen down one face, an icosahedron's
+outline is a perfect regular hexagon divided into ten triangles, and those are
+the ten triangles — worked out from the corners of the solid by the same
+arithmetic that draws the dice in the tray. The facets are tinted by how
+squarely each faces a light above and to the left, which is the only reason a
+flat drawing reads as solid.
+
+`public/favicon.svg` is the same mark on a dark rounded background, so it holds
+together on a pale browser tab; `public/favicon.ico` is that rendered at 16, 32
+and 48 pixels for older browsers. **If one changes, change all three.**
+
 ### `<app-stub-notice>`
 
 See above. Takes `detail` (what is not real) and `whatIsReal`.
@@ -120,16 +163,16 @@ See above. Takes `detail` (what is not real) and `whatIsReal`.
 
 ## Shared classes
 
-| Class | Use |
-|---|---|
-| `.page` | Screen wrapper. Add `.page--narrow` for forms and reading |
-| `.card` | A panel |
-| `.field` with `.field__label`, `.field__hint`, `.field__error` | A form field |
-| `.input`, `.select`, `.textarea` | Form controls |
-| `.btn` with `--primary`, `--ghost`, `--danger`, `--sm`, `--block` | Buttons |
-| `.row`, `.stack`, `.grid`, `.spacer` | Layout |
-| `.muted`, `.small`, `.mono` | Text |
-| `.visually-hidden` | Visible only to screen readers |
+| Class                                                             | Use                                                       |
+| ----------------------------------------------------------------- | --------------------------------------------------------- |
+| `.page`                                                           | Screen wrapper. Add `.page--narrow` for forms and reading |
+| `.card`                                                           | A panel                                                   |
+| `.field` with `.field__label`, `.field__hint`, `.field__error`    | A form field                                              |
+| `.input`, `.select`, `.textarea`                                  | Form controls                                             |
+| `.btn` with `--primary`, `--ghost`, `--danger`, `--sm`, `--block` | Buttons                                                   |
+| `.row`, `.stack`, `.grid`, `.spacer`                              | Layout                                                    |
+| `.muted`, `.small`, `.mono`                                       | Text                                                      |
+| `.visually-hidden`                                                | Visible only to screen readers                            |
 
 ---
 
@@ -143,8 +186,8 @@ label would be redundant, use `.visually-hidden`.
 
 ```html
 <span class="field__hint">
-  Encrypted before it is stored. Even someone holding a complete copy of the
-  database cannot read it.
+    Encrypted before it is stored. Even someone holding a complete copy of the
+    database cannot read it.
 </span>
 ```
 
@@ -155,10 +198,11 @@ know where it goes, and the field hint is the moment they are thinking about it.
 
 ```html
 @if (passwordTooShort()) {
-  <span class="field__error">At least 12 characters. Length matters far more
-    than punctuation.</span>
+<span class="field__error"
+    >At least 12 characters. Length matters far more than punctuation.</span
+>
 } @else {
-  <span class="field__hint">Hashed with Argon2id.</span>
+<span class="field__hint">Hashed with Argon2id.</span>
 }
 ```
 
@@ -183,8 +227,8 @@ on an action nobody, including us, can reverse:
 
 ```html
 <label class="field">
-  <span class="field__label">Type your username to confirm</span>
-  ...
+    <span class="field__label">Type your username to confirm</span>
+    ...
 </label>
 ```
 

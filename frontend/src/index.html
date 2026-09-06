@@ -1,13 +1,21 @@
 <!doctype html>
 <html lang="en">
-<head>
-  <meta charset="utf-8">
-  <title>Dmfe</title>
-  <base href="/">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="icon" type="image/x-icon" href="favicon.ico">
-</head>
-<body>
-  <app-root></app-root>
-</body>
+    <head>
+        <meta charset="utf-8" />
+        <title>Dmfe</title>
+        <base href="/" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <!--
+          The SVG mark is preferred by every current browser and stays sharp at
+          any size. `favicon.ico` is listed after it for older browsers, which
+          ignore the SVG and fall back to it. `apple-touch-icon` is what iOS
+          uses when someone adds the page to their home screen.
+        -->
+        <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+        <link rel="icon" type="image/x-icon" href="favicon.ico" sizes="any" />
+        <link rel="apple-touch-icon" href="favicon.svg" />
+    </head>
+    <body>
+        <app-root></app-root>
+    </body>
 </html>

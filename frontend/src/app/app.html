@@ -18,66 +18,82 @@
 <a class="skip-link" href="#main-content">Skip to content</a>
 
 <header class="shell-header">
-  <div class="shell-header__inner">
-    <a class="brand" routerLink="/play" (click)="closeMenu()">
-      <span class="brand__mark" aria-hidden="true">&#9670;</span>
-      <span class="brand__name">AI Dungeon Master</span>
-    </a>
+    <div class="shell-header__inner">
+        <a class="brand" routerLink="/play" (click)="closeMenu()">
+            <app-logo class="brand__mark" [size]="30" />
+            <span class="brand__name">AI Dungeon Master</span>
+        </a>
 
-    <button
-      type="button"
-      class="menu-toggle"
-      [attr.aria-expanded]="menuOpen()"
-      aria-controls="primary-navigation"
-      (click)="toggleMenu()"
-    >
-      <span class="visually-hidden">{{ menuOpen() ? 'Close menu' : 'Open menu' }}</span>
-      <span aria-hidden="true">{{ menuOpen() ? '✕' : '☰' }}</span>
-    </button>
+        <button
+            type="button"
+            class="menu-toggle"
+            [attr.aria-expanded]="menuOpen()"
+            aria-controls="primary-navigation"
+            (click)="toggleMenu()"
+        >
+            <span class="visually-hidden">{{ menuOpen() ? 'Close menu' : 'Open menu' }}</span>
+            <app-icon [name]="menuOpen() ? 'close' : 'menu'" [size]="22" />
+        </button>
 
-    <nav
-      id="primary-navigation"
-      class="shell-nav"
-      [class.shell-nav--open]="menuOpen()"
-      aria-label="Primary"
-    >
-      <a routerLink="/play" routerLinkActive="is-active" (click)="closeMenu()">Play</a>
-      <a routerLink="/campaigns" routerLinkActive="is-active" (click)="closeMenu()">Campaigns</a>
-      <a routerLink="/settings" routerLinkActive="is-active" (click)="closeMenu()">Settings</a>
-      <a routerLink="/account" routerLinkActive="is-active" (click)="closeMenu()">Account</a>
-      <a routerLink="/privacy" routerLinkActive="is-active" (click)="closeMenu()">Your data</a>
+        <nav id="primary-navigation" class="shell-nav" [class.shell-nav--open]="menuOpen()" aria-label="Primary">
+            <!--
+          Each link carries an icon as well as its words. The icon is
+          `aria-hidden` because the text beside it already says the same
+          thing, and a screen reader announcing "play play" is worse than
+          silence.
+        -->
+            <a routerLink="/play" routerLinkActive="is-active" (click)="closeMenu()">
+                <app-icon name="play_arrow" [size]="18" />
+                <span>Play</span>
+            </a>
+            <a routerLink="/campaigns" routerLinkActive="is-active" (click)="closeMenu()">
+                <app-icon name="auto_stories" [size]="18" />
+                <span>Campaigns</span>
+            </a>
+            <a routerLink="/settings" routerLinkActive="is-active" (click)="closeMenu()">
+                <app-icon name="settings" [size]="18" />
+                <span>Settings</span>
+            </a>
+            <a routerLink="/account" routerLinkActive="is-active" (click)="closeMenu()">
+                <app-icon name="person" [size]="18" />
+                <span>Account</span>
+            </a>
+            <a routerLink="/privacy" routerLinkActive="is-active" (click)="closeMenu()">
+                <app-icon name="shield" [size]="18" />
+                <span>Your data</span>
+            </a>
 
-      <span class="spacer"></span>
+            <span class="spacer"></span>
 
-      <span class="shell-nav__user">{{ displayName() }}</span>
-      <button type="button" class="btn btn--ghost btn--sm" (click)="signOut()">Sign out</button>
-    </nav>
-  </div>
+            <span class="shell-nav__user">{{ displayName() }}</span>
+            <button type="button" class="btn btn--ghost btn--sm" (click)="signOut()">Sign out</button>
+        </nav>
+    </div>
 
-  @if (isStub()) {
-    <!--
+    @if (isStub()) {
+        <!--
       Shown on every page while authentication is not real. It is deliberately
       hard to miss: a mock that cannot be distinguished from working software
       is a trap, both for a user who assumes their account is protected and for
       whoever picks this project up later.
     -->
-    <p class="demo-strip">
-      <strong>Demo mode.</strong>
-      Sign-in is not implemented yet, so you are using a shared demo account.
-      Nothing here is private, and everything is lost when the server restarts.
-      <a routerLink="/privacy">What this means</a>
-    </p>
-  }
+        <p class="demo-strip">
+            <strong>Demo mode.</strong>
+            Sign-in is not implemented yet, so you are using a shared demo account. Nothing here is private, and
+            everything is lost when the server restarts.
+            <a routerLink="/privacy">What this means</a>
+        </p>
+    }
 </header>
 
 <main id="main-content" class="shell-main" tabindex="-1">
-  <router-outlet />
+    <router-outlet />
 </main>
 
 <footer class="shell-footer">
-  <p class="small muted">
-    Your words are sent to Google Gemini to generate the Dungeon Master's replies.
-    Voice recordings are transcribed on our own server and are never sent to anyone else.
-    <a routerLink="/privacy">How your data is handled</a>
-  </p>
+    <p class="small muted">
+        Your words are sent to Google Gemini to generate the Dungeon Master's replies. Voice recordings are transcribed
+        on our own server and are never sent to anyone else.
+        <a routerLink="/privacy">How your data is handled</a>
+    </p>
 </footer>
