@@ -8,6 +8,36 @@ project root.
 
 ---
 
+## This is a monolith, on purpose
+
+**One application, one container, one process.** `uvicorn app.main:app` is the
+whole backend. There is no message broker, no task queue, no API gateway, and
+no service that calls another service over a network.
+
+Worth saying explicitly because the folder structure can be misread. `routes/`,
+`services/` and `repositories/` look like they could be three deployables. They
+are not — they are **layers inside one program**, and calls between them are
+ordinary Python function calls that never touch a network.
+
+**Why a monolith here.** Microservices buy independent deployment and
+independent scaling, and charge for it in operational complexity: several
+things to deploy, several sets of logs, network calls that can fail between
+your own components, and distributed transactions. For one developer new to
+application development, running one application with one log stream, that
+trade is firmly the wrong way round.
+
+There is also a specific benefit for *this* application. Encryption depends on
+a choke point — the repository layer being the only path to storage. That is
+easy to guarantee inside one process and considerably harder across a network
+boundary, where a second service could reach storage another way.
+
+**If you ever do split it**, the layer boundaries below are where the seams
+already are. But do not do it because the folder structure suggests it; do it
+because a specific part genuinely needs to scale separately, and be honest that
+you are buying that with operational complexity.
+
+---
+
 ## The three layers
 
 ```

@@ -62,6 +62,24 @@ encryption code that uses them is real and runs on every request.
 
 ---
 
+## The backend is one program
+
+The three boxes above are three **tiers** — a browser, a server, a database.
+That is not the same thing as microservices.
+
+**The backend itself is a single monolithic application**: one FastAPI app, one
+container, one process, one deployment. No queue, no broker, no gateway, no
+service calling another service. The internal structure described further down
+consists of layers inside that one program, connected by ordinary function
+calls.
+
+This is deliberate. One thing to deploy, one set of logs, one place a request
+can fail. See
+[the backend architecture](backend/docs/ARCHITECTURE.md) for the full
+reasoning.
+
+---
+
 ## What each piece is responsible for
 
 | Piece | Does | Never does |

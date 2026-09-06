@@ -37,6 +37,13 @@ crosses the network. It is authoritative where this file and it disagree.
    lines, no tool footers.
 9. **Changing the schema, encryption, or telemetry means updating the matching
    document in the same commit.**
+10. **The backend stays a single deployable.** One FastAPI application, one
+    container, one process. Do not split it into microservices, and do not add
+    a message broker, a task queue or an API gateway. `routes/`, `services/`
+    and `repositories/` are layers *inside* one program — ordinary function
+    calls, not network calls. This is a deliberate constraint: the person
+    running this is new to application development, and a monolith has one
+    thing to deploy, one set of logs, and one place a request can fail.
 
 ---
 
