@@ -15,7 +15,7 @@
 -->
 
 <div class="play" [class.play--conversational]="conversational()">
-    <app-dice-roller (rolled)="sendRoll($event)" />
+    <app-dice-roller #dice (rolled)="sendRoll($event)" />
     <div class="transcript" role="log" aria-live="polite" aria-label="Conversation with the Dungeon Master">
         @if (isEmpty() && !waiting()) {
             <div class="opening">
@@ -40,30 +40,6 @@
                         </button>
                     }
                 </div>
-
-                <!--
-          A shortcut to the narration setting, for deciding mid-scene that you
-          would rather read than listen. Shown whenever the browser can speak
-          at all, not only when it currently is — a switch that vanishes when
-          you turn it off cannot be turned back on.
-        -->
-                @if (speech.isSupported()) {
-                    <button
-                        type="button"
-                        class="chip chip--toggle"
-                        [class.chip--on]="speechAvailable()"
-                        (click)="toggleNarration()"
-                        [attr.aria-pressed]="speechAvailable()"
-                        [title]="
-                            speechAvailable()
-                                ? 'Stop the Dungeon Master reading aloud'
-                                : 'Have the Dungeon Master read aloud'
-                        "
-                    >
-                        <app-icon [name]="speechAvailable() ? 'volume_up' : 'volume_off'" [size]="14" />
-                        {{ speechAvailable() ? 'Reading aloud' : 'Text only' }}
-                    </button>
-                }
 
                 @if (conversationalAvailable()) {
                     <button type="button" class="handsfree-invite" (click)="toggleConversational()">
@@ -180,53 +156,97 @@
             </div>
         } @else {
             <div class="composer__row">
-                <label class="visually-hidden" for="message">What do you do?</label>
-                <textarea
-                    id="message"
-                    class="textarea composer__input"
-                    rows="2"
-                    placeholder="What do you do?"
-                    [ngModel]="draft()"
-                    (ngModelChange)="draft.set($event)"
-                    (keydown)="onKeydown($event)"
-                    [disabled]="waiting() || voice.isTranscribing()"
-                ></textarea>
-
-                @if (voiceAvailable()) {
+                <!--
+              Muting the narrator belongs here, beside the microphone, rather
+              than in a status line under the box. One control for what you
+              hear next to the control for what you say, both always visible.
+            -->
+                @if (speech.isSupported()) {
                     <button
                         type="button"
-                        class="icon-btn icon-btn--mic"
-                        (click)="toggleRecording()"
-                        [disabled]="waiting() || voice.isTranscribing()"
-                        [title]="voice.isTranscribing() ? 'Transcribing…' : 'Record a message'"
+                        class="round-btn round-btn--quiet"
+                        [class.round-btn--muted]="!speechAvailable()"
+                        (click)="toggleNarration()"
+                        [attr.aria-pressed]="speechAvailable()"
+                        [title]="speechAvailable() ? 'Mute the Dungeon Master' : 'Let the Dungeon Master read aloud'"
                     >
-                        @if (voice.isTranscribing()) {
-                            <app-icon name="graphic_eq" [size]="20" label="Transcribing your recording" />
-                        } @else {
-                            <app-icon name="mic" [size]="20" label="Record a message" />
-                        }
+                        <app-icon
+                            [name]="speechAvailable() ? 'volume_up' : 'volume_off'"
+                            [size]="20"
+                            [label]="speechAvailable() ? 'Mute the Dungeon Master' : 'Unmute the Dungeon Master'"
+                        />
                     </button>
                 }
 
+                <button
+                    type="button"
+                    class="round-btn round-btn--quiet"
+                    [class.round-btn--dice-open]="dice.open()"
+                    (click)="dice.toggle()"
+                    [attr.aria-expanded]="dice.open()"
+                    title="Dice"
+                >
+                    <app-icon name="casino" [size]="20" [label]="dice.open() ? 'Close dice' : 'Open dice'" />
+                </button>
+
+                <!-- The message box and the microphone share one pill, the way
+                 every messaging application draws it. -->
+                <div class="field-pill" [class.field-pill--busy]="waiting() || voice.isTranscribing()">
+                    <label class="visually-hidden" for="message">What do you do?</label>
+                    <textarea
+                        id="message"
+                        class="field-pill__input"
+                        rows="1"
+                        placeholder="What do you do?"
+                        [ngModel]="draft()"
+                        (ngModelChange)="draft.set($event)"
+                        (keydown)="onKeydown($event)"
+                        (input)="autoGrow($event)"
+                        [disabled]="waiting() || voice.isTranscribing()"
+                    ></textarea>
+
+                    @if (voiceAvailable()) {
+                        <button
+                            type="button"
+                            class="field-pill__mic"
+                            (click)="toggleRecording()"
+                            [disabled]="waiting() || voice.isTranscribing()"
+                            [title]="voice.isTranscribing() ? 'Transcribing…' : 'Record a message'"
+                        >
+                            @if (voice.isTranscribing()) {
+                                <app-icon name="graphic_eq" [size]="19" label="Transcribing your recording" />
+                            } @else {
+                                <app-icon name="mic" [size]="19" label="Record a message" />
+                            }
+                        </button>
+                    }
+                </div>
+
+                <!--
+              One round button on the right that changes job: send while there
+              is something to send, stop while the Dungeon Master is busy. It
+              is the same button in the same place either way, so the thumb
+              does not have to move.
+            -->
                 @if (phase() === 'thinking' || phase() === 'speaking') {
                     <button
                         type="button"
-                        class="btn btn--stop composer__send"
+                        class="round-btn round-btn--stop"
                         (click)="stopEverything()"
                         [title]="phase() === 'thinking' ? 'Stop waiting for the reply' : 'Stop reading aloud'"
                     >
-                        <app-icon name="stop" [size]="16" />
-                        <span class="composer__send-label">Stop</span>
+                        <app-icon name="stop" [size]="18" label="Stop" />
                     </button>
                 } @else {
                     <button
                         type="button"
-                        class="btn btn--primary composer__send"
+                        class="round-btn round-btn--send"
+                        [class.round-btn--ready]="canSend()"
                         (click)="send('typed')"
                         [disabled]="!canSend()"
+                        title="Send"
                     >
-                        <app-icon name="send" [size]="16" />
-                        <span class="composer__send-label">Send</span>
+                        <app-icon name="arrow_upward" [size]="20" label="Send" />
                     </button>
                 }
             </div>
@@ -256,7 +276,7 @@
                     </button>
                 }
                 @default {
-                    <span class="muted">Press Enter to send, Shift+Enter for a new line.</span>
+                    <span class="muted statusline__hint">Press Enter to send, Shift+Enter for a new line.</span>
                 }
             }
 

@@ -566,3 +566,140 @@ a {
         transition-duration: 0.01ms !important;
     }
 }
+
+/* ---------------------------------------------------------------------
+   Round buttons and chips
+
+   Both live here rather than in the play screen that currently uses them,
+   because neither is about a chat: a round icon button and a small pill of a
+   label are generic patterns, and the dice tray already grew its own
+   near-duplicates before these existed. Shared classes belong in the shared
+   stylesheet — see UI_PATTERNS.md.
+   --------------------------------------------------------------------- */
+
+/* The round buttons either side of the pill. */
+.round-btn {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    /* Matches the pill's minimum height, so everything in the row lines up
+     whether the buttons sit beside one line of text or six. */
+    width: 44px;
+    height: 44px;
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+    transition:
+        background var(--transition),
+        color var(--transition),
+        transform var(--transition),
+        opacity var(--transition);
+
+    &:active:not(:disabled) {
+        transform: scale(0.92);
+    }
+
+    /* The mute control. Deliberately understated — it is a thing you set once
+     and forget, not a thing you are being invited to press. */
+    &--quiet {
+        background: var(--surface-raised);
+        color: var(--ink-muted);
+
+        &:hover {
+            color: var(--accent-strong);
+        }
+    }
+
+    /* The dice button while the tray is open, so it reads as the thing that
+     opened it rather than another way to open it again. */
+    &--dice-open {
+        background: var(--accent);
+        color: var(--accent-ink);
+    }
+
+    &--muted {
+        color: var(--danger);
+        background: color-mix(in srgb, var(--danger) 14%, var(--surface-raised));
+    }
+
+    /* Send. Grey and unmissable-but-inert until there is something to send,
+     which is the clearest way to show that the box is empty. */
+    &--send {
+        background: var(--surface-raised);
+        color: var(--ink-faint);
+
+        &:disabled {
+            cursor: default;
+        }
+    }
+
+    &--ready {
+        background: var(--accent);
+        color: var(--accent-ink);
+
+        &:hover {
+            background: var(--accent-strong);
+        }
+    }
+
+    &--stop {
+        background: var(--danger);
+        color: var(--bg);
+    }
+}
+
+.chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    /* A chip is a label, not a paragraph. Without this "Hands-free" breaks
+     across two lines at the hyphen on a narrow window and the chip grows into
+     a lozenge twice its height. */
+    white-space: nowrap;
+    flex-shrink: 0;
+    padding: 4px 10px;
+    border: 1px solid var(--border-strong);
+    border-radius: 999px;
+    background: transparent;
+    color: var(--ink-muted);
+    font: inherit;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition:
+        color var(--transition),
+        border-color var(--transition),
+        background var(--transition);
+
+    &:hover:not(:disabled) {
+        color: var(--ink);
+        border-color: var(--accent);
+    }
+    &:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    &--on {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: var(--accent-ink);
+        font-weight: 600;
+    }
+}
+
+.chip--stop {
+    border-color: var(--danger);
+    color: var(--danger);
+
+    &:hover {
+        background: var(--danger-bg);
+        color: var(--danger);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .round-btn:active:not(:disabled) {
+        transform: none;
+    }
+}

@@ -1,5 +1,5 @@
 /**
- * The dice tray: a floating button that opens a roller.
+ * The dice tray.
  *
  * WHY THIS IS WORTH BUILDING AT ALL
  *
@@ -21,6 +21,18 @@
  *
  * They apply to a d20 only, so the toggle disappears for other dice rather
  * than sitting there doing nothing.
+ *
+ * WHAT OPENS IT
+ *
+ * Not this component. It draws the tray and nothing else; whoever uses it
+ * supplies the button and calls `toggle`. The play screen puts that button in
+ * the message bar, beside the microphone.
+ *
+ * It used to open itself, from a round button floating over the bottom-right
+ * corner. That is exactly where a messaging application puts its send button,
+ * and no amount of nudging it upwards survives a message box that grows as you
+ * type — so the button moved into the bar and the floating one was removed
+ * rather than left as a second way in.
  */
 
 import { ChangeDetectionStrategy, Component, computed, output, signal } from '@angular/core';

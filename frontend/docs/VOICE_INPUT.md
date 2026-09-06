@@ -190,13 +190,22 @@ is why this direction needs no defending.
 
 Two controls, because they answer two different questions.
 
-**"Do I want to be read to at all?"** is a toggle, in Settings and repeated as a
-chip on the play screen. It is saved **to the account**, so it follows the
-person between devices — a preference about them, not about their hardware. The
-chip is a shortcut to the same setting rather than a second switch, because two
-switches that can disagree is a bug waiting to happen. It appears whenever the
-browser can speak at all, not only when it currently is: a control that
-disappears when you turn it off cannot be turned back on.
+**"Do I want to be read to at all?"** is a toggle, in Settings and repeated as
+a speaker button in the message bar, immediately left of the box you type in.
+It is saved **to the account**, so it follows the person between devices — a
+preference about them, not about their hardware. The button is a shortcut to
+the same setting rather than a second switch, because two switches that can
+disagree is a bug waiting to happen.
+
+Its placement was got wrong twice, which is worth recording. It began as a text
+chip in the status line _under_ the message box, where it fell below the fold
+on a short window and was never seen. Muting belongs next to the microphone —
+one control for what you hear beside the control for what you say, both always
+visible — and it is drawn as a speaker icon rather than words because that is
+what people scan for when they want silence.
+
+It appears whenever the browser can speak at all, not only when it currently
+is: a control that disappears when you turn it off cannot be turned back on.
 
 Switching it off also ends hands-free play, which has nothing left to wait for.
 

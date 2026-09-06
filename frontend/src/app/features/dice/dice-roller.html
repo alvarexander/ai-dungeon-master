@@ -165,15 +165,3 @@
         </button>
     </section>
 }
-
-<!-- The floating button that opens all of the above -->
-<button
-    type="button"
-    class="fab"
-    [class.fab--open]="open()"
-    (click)="toggle()"
-    [attr.aria-expanded]="open()"
-    title="Dice"
->
-    <app-icon [name]="open() ? 'close' : 'casino'" [size]="24" [label]="open() ? 'Close dice' : 'Open dice'" />
-</button>

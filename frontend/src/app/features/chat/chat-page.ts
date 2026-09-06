@@ -171,6 +171,30 @@ export class ChatPage {
     }
 
     /**
+     * Grow the message box as the text wraps, and shrink it again.
+     *
+     * A single-line pill that silently scrolls hides what somebody has written,
+     * and a permanently three-line box wastes the screen when almost every
+     * message is one line. Growing to fit is what messaging applications do,
+     * and it is the only reason this needs JavaScript at all — CSS still has no
+     * way to size a `textarea` to its content.
+     *
+     * Reset to `auto` first, or the box can only ever get taller: `scrollHeight`
+     * of an element already tall enough is just its current height.
+     *
+     * @param event The input event from the message box.
+     * @returns Nothing.
+     */
+    autoGrow(event: Event): void {
+        const box = event.target as HTMLTextAreaElement;
+        box.style.height = 'auto';
+        box.style.height = `${box.scrollHeight}px`;
+        // Past one line the pill's ends should square off into a rounded
+        // rectangle. A class is cheaper than measuring in the stylesheet.
+        box.classList.toggle('is-tall', box.scrollHeight > 34);
+    }
+
+    /**
      * Handle a key press in the message box.
      *
      * Enter sends; Shift+Enter starts a new line — the convention every chat

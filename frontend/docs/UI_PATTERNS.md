@@ -132,6 +132,43 @@ when the icon is the only label, as on an icon-only button.
 To add one: find it at fonts.google.com/icons, copy the path data from the 24px
 outlined variant, and add an entry to `ICONS` in `shared/ui/icon.ts`.
 
+### The message bar
+
+The play screen's composer, and the one piece of the interface people will use
+more than any other. It is drawn the way a messaging application draws it, not
+the way a form is drawn:
+
+```
+( 🔊 ) ( 🎲 )  [ What do you do?              🎤 ]  ( ↑ )
+```
+
+- A **rounded pill** holds the message and the microphone together, because
+  they are one thing: what you are saying.
+- **Round buttons** either side, never labelled rectangles.
+- The **send button changes job rather than moving**: it is Send while there is
+  something to send and Stop while the Dungeon Master is thinking or speaking.
+  Same button, same place, so the thumb does not have to hunt.
+- It is **grey and inert until there is text**, which is the plainest way to
+  show that the box is empty.
+- The box **grows as the text wraps**, up to about six lines, then scrolls. Past
+  one line the pill's ends square off into a rounded rectangle, because a pill
+  with three lines in it looks wrong.
+
+Two placements were got wrong first, and both are worth remembering:
+
+**Muting was a text chip in the status line under the box.** On a short window
+it fell below the fold and was simply never seen. It belongs beside the
+microphone: one control for what you hear next to the control for what you say.
+
+**The dice tray opened from a floating button in the bottom-right corner.**
+That is exactly where a messaging application puts its send button, and the two
+overlapped. No amount of nudging the floating button upwards survives a message
+box that grows as you type, so it moved into the bar and the floating one was
+removed rather than left as a second way in.
+
+The general lesson: on a screen with a composer, the bottom-right corner is
+already spoken for.
+
 ### `<app-logo>`
 
 The application mark: a twenty-sided die, seen straight down one of its faces.

@@ -245,52 +245,139 @@
     margin-bottom: var(--space-4);
 }
 
+/* ---------------------------------------------------------------------
+   The composer
+
+   Drawn the way a messaging application draws it: a rounded pill holding the
+   text and the microphone, a round send button beside it, and round buttons
+   either side rather than rectangles. The older version was a bordered box
+   with two labelled rectangular buttons, which reads as a form to fill in
+   rather than a conversation to join.
+   --------------------------------------------------------------------- */
+
 .composer {
     position: sticky;
     bottom: 0;
-    padding-top: var(--space-3);
-    background: linear-gradient(to bottom, transparent, var(--bg) 24px);
+    padding: var(--space-3) 0 var(--space-2);
+    background: linear-gradient(to bottom, transparent, var(--bg) 20px);
 
     &__row {
         display: flex;
         gap: var(--space-2);
+        /* Bottom-aligned, so the round buttons stay level with the last line
+       of a message box that has grown to several lines. */
         align-items: flex-end;
+    }
+}
+
+/* The pill holding the message and the microphone. */
+.field-pill {
+    flex: 1;
+    display: flex;
+    /* Centred, so a single line of text sits in the middle of the pill rather
+     than resting on its floor. Only once the text wraps does bottom-alignment
+     become the right answer, which is what the `:has` rule below switches to. */
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+    min-height: 44px;
+    padding: 4px 5px 4px var(--space-4);
+    border: 1px solid var(--border-strong);
+    /* A very large radius resolves to "half the height" at any height, which
+     is what keeps the ends perfectly round as the box grows. */
+    border-radius: 999px;
+    background: var(--surface-sunken);
+    transition:
+        border-color var(--transition),
+        background var(--transition);
+
+    &:focus-within {
+        border-color: var(--accent);
+        background: var(--surface);
+    }
+
+    &--busy {
+        opacity: 0.7;
+    }
+
+    /* Once the text wraps, a pill looks wrong — the corners want to be a
+     rounded rectangle instead. 22px matches the radius at one line. The
+     microphone drops to the bottom so it stays beside the last line, which is
+     where the cursor is. */
+    &:has(.field-pill__input.is-tall) {
+        align-items: flex-end;
+        border-radius: 22px;
     }
 
     &__input {
         flex: 1;
-        min-height: 60px;
+        min-width: 0;
+        /* Grown from JavaScript as the text wraps. The cap is about six lines,
+       after which it scrolls rather than swallowing the conversation. */
+        height: 26px;
+        max-height: 148px;
+        padding: 0;
+        border: none;
+        background: none;
+        color: var(--ink);
+        font: inherit;
+        line-height: 26px;
+        resize: none;
+        outline: none;
+
+        &::placeholder {
+            color: var(--ink-faint);
+        }
     }
-    &__send {
-        align-self: stretch;
+
+    /* Sits inside the pill, against its right edge. */
+    &__mic {
+        flex-shrink: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 34px;
+        height: 34px;
+        border: none;
+        border-radius: 50%;
+        background: transparent;
+        color: var(--ink-muted);
+        cursor: pointer;
+        transition:
+            color var(--transition),
+            background var(--transition);
+
+        &:hover:not(:disabled) {
+            color: var(--accent-strong);
+            background: color-mix(in srgb, var(--accent) 14%, transparent);
+        }
+
+        &:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+        }
     }
 }
 
+/* The one square button left: dismissing a recording in the listening bar,
+   where it sits among text rather than beside the pill. */
 .icon-btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    padding: 12px;
-    border: 1px solid var(--border-strong);
-    border-radius: var(--radius);
-    background: var(--surface-raised);
-    color: var(--ink);
+    padding: 8px;
+    border: none;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--ink-muted);
     cursor: pointer;
     transition:
-        border-color var(--transition),
-        color var(--transition);
+        color var(--transition),
+        background var(--transition);
 
-    &:hover:not(:disabled) {
-        border-color: var(--accent);
-        color: var(--accent-strong);
-    }
-    &:disabled {
-        opacity: 0.5;
-        cursor: not-allowed;
-    }
-
-    &--mic {
-        align-self: stretch;
+    &:hover {
+        color: var(--ink);
+        background: color-mix(in srgb, var(--ink) 10%, transparent);
     }
 }
 
@@ -337,39 +424,48 @@
     &__live {
         color: var(--accent-strong);
     }
+
+    /* A keyboard hint, so it goes when there is no room for it — which is
+     roughly the same width at which there is unlikely to be a keyboard. The
+     chips beside it are controls and stay. */
+    &__hint {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
 }
 
-.chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    padding: 4px 10px;
-    border: 1px solid var(--border-strong);
-    border-radius: 999px;
-    background: transparent;
-    color: var(--ink-muted);
-    font: inherit;
-    font-size: 0.8rem;
-    cursor: pointer;
-    transition:
-        color var(--transition),
-        border-color var(--transition),
-        background var(--transition);
+/*
+  Narrow windows.
 
-    &:hover:not(:disabled) {
-        color: var(--ink);
-        border-color: var(--accent);
-    }
-    &:disabled {
-        opacity: 0.5;
-        cursor: not-allowed;
+  Four controls plus a text field is a lot for a phone, and at full size the
+  placeholder gets cut off mid-question. Everything loses a few pixels rather
+  than anything being dropped — a control that disappears on a small screen is
+  a feature the phone user does not have.
+*/
+@media (max-width: 560px) {
+    .statusline__hint {
+        display: none;
     }
 
-    &--on {
-        background: var(--accent);
-        border-color: var(--accent);
-        color: var(--accent-ink);
-        font-weight: 600;
+    .composer__row {
+        gap: 6px;
+    }
+
+    .round-btn {
+        width: 38px;
+        height: 38px;
+    }
+
+    .field-pill {
+        min-height: 38px;
+        padding-left: var(--space-3);
+
+        &__mic {
+            width: 30px;
+            height: 30px;
+        }
     }
 }
 
@@ -381,16 +477,6 @@
 
     &:hover {
         filter: brightness(1.1);
-    }
-}
-
-.chip--stop {
-    border-color: var(--danger);
-    color: var(--danger);
-
-    &:hover {
-        background: var(--danger-bg);
-        color: var(--danger);
     }
 }
 

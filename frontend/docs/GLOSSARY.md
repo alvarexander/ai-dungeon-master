@@ -155,7 +155,10 @@ characters.
 
 **Floating action button (FAB)** — a round button that hovers over the page
 rather than sitting in the layout, used for one thing the user might want at
-any moment. Here it is the dice tray.
+any moment. The dice tray used one, and no longer does: a button floating over
+the bottom-right corner sits exactly where a messaging application puts its
+send button, and no amount of nudging it upwards survives a message box that
+grows as you type. It is a round button in the message bar instead.
 
 **Face placement** — where one face of a die goes: the two turns that point it
 the right way, how far out from the centre it sits, and the outline that cuts
