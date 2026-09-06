@@ -33,11 +33,11 @@ import { APP_CONFIG } from '../app-config';
  * @returns The response stream.
  */
 export const credentialsInterceptor: HttpInterceptorFn = (request, next) => {
-  const config = inject(APP_CONFIG);
+    const config = inject(APP_CONFIG);
 
-  if (!request.url.startsWith(config.apiBaseUrl)) {
-    return next(request);
-  }
+    if (!request.url.startsWith(config.apiBaseUrl)) {
+        return next(request);
+    }
 
-  return next(request.clone({ withCredentials: true }));
+    return next(request.clone({ withCredentials: true }));
 };

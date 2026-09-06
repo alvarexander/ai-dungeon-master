@@ -6,9 +6,12 @@
     "start": "ng serve",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
-    "test": "ng test",
     "lint": "ng lint",
-    "format": "prettier --write \"src/**/*.{ts,html,scss}\""
+    "format": "npm run prettier:write && npm run lint:fix",
+    "lint:fix": "ng lint --fix",
+    "prettier:write": "prettier --write \"src/**/*.{ts,html,scss,css}\"",
+    "prettier:check": "prettier --check \"src/**/*.{ts,html,scss,css}\"",
+    "test": "ng test"
   },
   "private": true,
   "packageManager": "npm@11.19.0",
@@ -26,9 +29,13 @@
     "@angular/build": "^22.1.7",
     "@angular/cli": "^22.1.7",
     "@angular/compiler-cli": "^22.1.0",
+    "@eslint/js": "^10.0.1",
+    "angular-eslint": "22.2.0",
+    "eslint": "^10.9.0",
     "jsdom": "^28.0.0",
     "prettier": "^3.8.1",
     "typescript": "~6.0.2",
+    "typescript-eslint": "8.67.0",
     "vitest": "^4.0.8"
   },
   "description": "Angular client for the AI Dungeon Master. Builds to static files; no server process at runtime."

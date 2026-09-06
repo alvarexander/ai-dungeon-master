@@ -22,22 +22,22 @@ import { SessionStore } from '../state/session.store';
  * @returns The response stream.
  */
 export const authInterceptor: HttpInterceptorFn = (request, next) => {
-  const config = inject(APP_CONFIG);
-  const session = inject(SessionStore);
+    const config = inject(APP_CONFIG);
+    const session = inject(SessionStore);
 
-  // Scoped to our own backend. Sending a session token to any other address
-  // would hand a credential to a third party.
-  if (!request.url.startsWith(config.apiBaseUrl)) {
-    return next(request);
-  }
+    // Scoped to our own backend. Sending a session token to any other address
+    // would hand a credential to a third party.
+    if (!request.url.startsWith(config.apiBaseUrl)) {
+        return next(request);
+    }
 
-  const token = session.token();
-  if (!token) {
-    // No token is a valid state in Phase 1: the backend then treats the
-    // request as the demo account, which is what lets the interface be
-    // explored without signing in.
-    return next(request);
-  }
+    const token = session.token();
+    if (!token) {
+        // No token is a valid state in Phase 1: the backend then treats the
+        // request as the demo account, which is what lets the interface be
+        // explored without signing in.
+        return next(request);
+    }
 
-  return next(request.clone({ setHeaders: { Authorization: `Bearer ${token}` } }));
+    return next(request.clone({ setHeaders: { Authorization: `Bearer ${token}` } }));
 };

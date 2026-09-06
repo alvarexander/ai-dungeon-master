@@ -11,10 +11,10 @@ No NgModules anywhere. Every component declares its own imports:
 
 ```typescript
 @Component({
-  selector: 'app-campaign-list-page',
-  changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, Banner],
-  template: `...`,
+    selector: 'app-campaign-list-page',
+    changeDetection: ChangeDetectionStrategy.OnPush,
+    imports: [RouterLink, Banner],
+    template: `...`
 })
 export class CampaignListPage {}
 ```
@@ -27,14 +27,14 @@ changed, rather than checking everything after every event.
 
 ## Naming
 
-| Thing | Style | Example |
-|---|---|---|
-| Files | kebab-case | `campaign-list-page.ts` |
-| Classes | PascalCase | `CampaignListPage` |
-| Selectors | `app-` prefix, kebab | `app-campaign-list-page` |
-| Screens | `*Page` suffix | `ChatPage` |
-| Stores | `*Store` suffix | `SessionStore` |
-| Private signals | leading underscore | `_lines` |
+| Thing           | Style                | Example                  |
+| --------------- | -------------------- | ------------------------ |
+| Files           | kebab-case           | `campaign-list-page.ts`  |
+| Classes         | PascalCase           | `CampaignListPage`       |
+| Selectors       | `app-` prefix, kebab | `app-campaign-list-page` |
+| Screens         | `*Page` suffix       | `ChatPage`               |
+| Stores          | `*Store` suffix      | `SessionStore`           |
+| Private signals | leading underscore   | `_lines`                 |
 
 Angular 22's generator omits `.component` from filenames. That convention is
 followed here: `chat-page.ts`, not `chat-page.component.ts`.
@@ -96,7 +96,7 @@ change, losing focus and scroll position.
 
 ```html
 @if (error(); as message) {
-  <app-banner kind="danger">{{ message }}</app-banner>
+<app-banner kind="danger">{{ message }}</app-banner>
 }
 ```
 
@@ -109,22 +109,44 @@ keyboards and screen readers.
 
 ---
 
-## Styles
+## Formatting and linting
 
-**Component styles for anything specific to that component.** Angular scopes
-them automatically, so a class name cannot leak.
+**Prettier owns formatting. ESLint owns correctness.** They do not overlap, and
+adding stylistic rules to ESLint only makes them fight.
 
-**Shared classes in `styles.scss`** for genuinely global patterns: `.btn`,
-`.card`, `.field`, `.banner`, `.page`.
+```bash
+npm run format          # prettier --write, then eslint --fix
+npm run prettier:check  # is everything formatted?
+npm run lint            # correctness only
+```
 
-**Always use the design tokens.** `var(--surface)`, never `#1a1d26`. The theme
-switch works by redefining those variables; a hard-coded colour will not
-change with it and will be unreadable in the other theme.
+The settings, in `.prettierrc.json`, match the other repositories in this
+account:
 
-Small components use inline `styles: []`; larger ones use a `.scss` file. The
-line is roughly forty lines of CSS.
+| Setting         | Value                |
+| --------------- | -------------------- |
+| Indent          | 4 spaces             |
+| Quotes          | single               |
+| Semicolons      | yes                  |
+| Trailing commas | **none**             |
+| Line width      | 120 (80 in Markdown) |
+| Line endings    | LF                   |
+
+**Do not argue with the formatter.** Run it and move on; that is the entire
+point of having one.
+
+The ESLint rules worth knowing, from `eslint.config.js`:
+
+- **`no-explicit-any` is an error.** `any` switches off the type checker
+  exactly where a type would have helped. Use `unknown` and narrow it.
+- **`explicit-function-return-type` is a warning**, with inline callbacks
+  exempt — annotating every `computed(() => ...)` adds noise, not information.
+- **`no-console` is a warning**, allowing `warn`, `error` and `info`.
+  `console.log` is for debugging and should not survive review.
 
 ---
+
+## Styles
 
 ## TSDoc comments
 
@@ -161,7 +183,9 @@ help them.
 
 ```html
 @if (correlationId(); as id) {
-  <p class="small">If you report this, quote: <code class="mono">{{ id }}</code></p>
+<p class="small">
+    If you report this, quote: <code class="mono">{{ id }}</code>
+</p>
 }
 ```
 
@@ -177,8 +201,8 @@ is not implemented **and** what genuinely is:
 
 ```html
 <app-stub-notice
-  detail="Signing in does not yet create a real, protected session."
-  whatIsReal="Your password is genuinely checked against an Argon2id hash."
+    detail="Signing in does not yet create a real, protected session."
+    whatIsReal="Your password is genuinely checked against an Argon2id hash."
 />
 ```
 
@@ -198,8 +222,12 @@ saying which parts.
 - **Never call `HttpClient` directly** — use `ApiClient`, so the base address
   and the interceptors apply.
 - **Never remove a focus outline.**
-- **Never use `any`.** If a type is genuinely unknown, use `unknown` and narrow
-  it.
+- **Never use `any`.** ESLint treats it as an error. If a type is genuinely
+  unknown, use `unknown` and narrow it.
+- **Never use an emoji as an icon.** Use `<app-icon>`, which draws Material
+  Symbols inline as SVG. Emoji render differently on every platform, cannot be
+  recoloured, and are read aloud by screen readers as their unicode name.
+- **Never animate without honouring `prefers-reduced-motion`.**
 
 ---
 

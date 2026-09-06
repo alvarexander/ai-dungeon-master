@@ -30,8 +30,8 @@ import { loadAppConfig } from './app/core/app-config';
  * @param error Whatever prevented startup.
  */
 function showStartupFailure(error: unknown): void {
-  const message = error instanceof Error ? error.message : String(error);
-  document.body.innerHTML = `
+    const message = error instanceof Error ? error.message : String(error);
+    document.body.innerHTML = `
     <div style="font-family: system-ui, sans-serif; max-width: 640px; margin: 15vh auto;
                 padding: 32px; background: #1a1d26; color: #e8ecf3; border-radius: 16px;
                 border: 1px solid #3a4152; line-height: 1.6;">
@@ -58,14 +58,14 @@ function showStartupFailure(error: unknown): void {
  * @returns The text with HTML-significant characters replaced.
  */
 function escapeHtml(value: string): string {
-  const element = document.createElement('div');
-  element.textContent = value;
-  return element.innerHTML;
+    const element = document.createElement('div');
+    element.textContent = value;
+    return element.innerHTML;
 }
 
 loadAppConfig()
-  .then((config) => bootstrapApplication(App, buildAppConfig(config)))
-  .catch((error) => {
-    console.error('[startup]', error);
-    showStartupFailure(error);
-  });
+    .then((config) => bootstrapApplication(App, buildAppConfig(config)))
+    .catch((error) => {
+        console.error('[startup]', error);
+        showStartupFailure(error);
+    });

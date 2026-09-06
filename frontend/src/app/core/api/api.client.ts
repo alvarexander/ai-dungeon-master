@@ -25,97 +25,97 @@ export type QueryParams = Record<string, string | number | boolean | undefined>;
 
 @Injectable({ providedIn: 'root' })
 export class ApiClient {
-  private readonly http = inject(HttpClient);
-  private readonly config = inject(APP_CONFIG);
+    private readonly http = inject(HttpClient);
+    private readonly config = inject(APP_CONFIG);
 
-  /**
-   * Build the full address of an endpoint.
-   *
-   * @param path The path, starting with a slash, e.g. `/api/v1/campaigns`.
-   * @returns The complete URL.
-   */
-  url(path: string): string {
-    return `${this.config.apiBaseUrl}${path}`;
-  }
-
-  /**
-   * Convert a plain object into query parameters, dropping empty values.
-   *
-   * @param params The values to include.
-   * @returns Angular's parameter object.
-   */
-  private toParams(params?: QueryParams): HttpParams {
-    let httpParams = new HttpParams();
-    for (const [key, value] of Object.entries(params ?? {})) {
-      if (value !== undefined && value !== null && value !== '') {
-        httpParams = httpParams.set(key, String(value));
-      }
+    /**
+     * Build the full address of an endpoint.
+     *
+     * @param path The path, starting with a slash, e.g. `/api/v1/campaigns`.
+     * @returns The complete URL.
+     */
+    url(path: string): string {
+        return `${this.config.apiBaseUrl}${path}`;
     }
-    return httpParams;
-  }
 
-  /**
-   * Send a GET request.
-   *
-   * A reminder enforced by review rather than by code: **never put personal
-   * data in these parameters.** Query strings are recorded in server access
-   * logs, browser history and proxy logs, all of which sit outside the
-   * encryption boundary. Identifiers and page numbers only.
-   *
-   * @param path The endpoint path.
-   * @param params Optional query parameters.
-   * @returns The parsed response.
-   */
-  get<T>(path: string, params?: QueryParams): Observable<T> {
-    return this.http.get<T>(this.url(path), { params: this.toParams(params) });
-  }
+    /**
+     * Convert a plain object into query parameters, dropping empty values.
+     *
+     * @param params The values to include.
+     * @returns Angular's parameter object.
+     */
+    private toParams(params?: QueryParams): HttpParams {
+        let httpParams = new HttpParams();
+        for (const [key, value] of Object.entries(params ?? {})) {
+            if (value !== undefined && value !== null && value !== '') {
+                httpParams = httpParams.set(key, String(value));
+            }
+        }
+        return httpParams;
+    }
 
-  /**
-   * Send a POST request.
-   *
-   * @param path The endpoint path.
-   * @param body The request body, sent as JSON.
-   * @returns The parsed response.
-   */
-  post<T>(path: string, body: unknown): Observable<T> {
-    return this.http.post<T>(this.url(path), body);
-  }
+    /**
+     * Send a GET request.
+     *
+     * A reminder enforced by review rather than by code: **never put personal
+     * data in these parameters.** Query strings are recorded in server access
+     * logs, browser history and proxy logs, all of which sit outside the
+     * encryption boundary. Identifiers and page numbers only.
+     *
+     * @param path The endpoint path.
+     * @param params Optional query parameters.
+     * @returns The parsed response.
+     */
+    get<T>(path: string, params?: QueryParams): Observable<T> {
+        return this.http.get<T>(this.url(path), { params: this.toParams(params) });
+    }
 
-  /**
-   * Send a PATCH request, for partial updates.
-   *
-   * @param path The endpoint path.
-   * @param body The fields to change.
-   * @returns The parsed response.
-   */
-  patch<T>(path: string, body: unknown): Observable<T> {
-    return this.http.patch<T>(this.url(path), body);
-  }
+    /**
+     * Send a POST request.
+     *
+     * @param path The endpoint path.
+     * @param body The request body, sent as JSON.
+     * @returns The parsed response.
+     */
+    post<T>(path: string, body: unknown): Observable<T> {
+        return this.http.post<T>(this.url(path), body);
+    }
 
-  /**
-   * Send a DELETE request.
-   *
-   * @param path The endpoint path.
-   * @returns The parsed response.
-   */
-  delete<T>(path: string): Observable<T> {
-    return this.http.delete<T>(this.url(path));
-  }
+    /**
+     * Send a PATCH request, for partial updates.
+     *
+     * @param path The endpoint path.
+     * @param body The fields to change.
+     * @returns The parsed response.
+     */
+    patch<T>(path: string, body: unknown): Observable<T> {
+        return this.http.patch<T>(this.url(path), body);
+    }
 
-  /**
-   * Upload a file.
-   *
-   * Used for voice recordings. The body is `FormData` rather than JSON, and
-   * the `Content-Type` header is deliberately not set — the browser must set
-   * it itself, because it has to include a generated boundary marker that
-   * separates the parts of the upload. Setting it by hand produces an upload
-   * the server cannot parse, which is a classic afternoon lost.
-   *
-   * @param path The endpoint path.
-   * @param formData The multipart body.
-   * @returns The parsed response.
-   */
-  upload<T>(path: string, formData: FormData): Observable<T> {
-    return this.http.post<T>(this.url(path), formData);
-  }
+    /**
+     * Send a DELETE request.
+     *
+     * @param path The endpoint path.
+     * @returns The parsed response.
+     */
+    delete<T>(path: string): Observable<T> {
+        return this.http.delete<T>(this.url(path));
+    }
+
+    /**
+     * Upload a file.
+     *
+     * Used for voice recordings. The body is `FormData` rather than JSON, and
+     * the `Content-Type` header is deliberately not set — the browser must set
+     * it itself, because it has to include a generated boundary marker that
+     * separates the parts of the upload. Setting it by hand produces an upload
+     * the server cannot parse, which is a classic afternoon lost.
+     *
+     * @param path The endpoint path.
+     * @param formData The multipart body.
+     * @returns The parsed response.
+     */
+    upload<T>(path: string, formData: FormData): Observable<T> {
+        return this.http.post<T>(this.url(path), formData);
+    }
 }
