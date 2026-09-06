@@ -75,7 +75,7 @@ attacker's page cannot read. See the
 [backend security document](../backend/docs/SECURITY.md).
 
 **SSRF (Server-Side Request Forgery)** — an attack where somebody persuades your
-*server* to make a request on their behalf, typically to an address only the
+_server_ to make a request on their behalf, typically to an address only the
 server can reach, such as a cloud provider's internal credential service.
 
 **XSS (Cross-Site Scripting)** — an attack where somebody gets their code to run
@@ -133,7 +133,7 @@ application refuses to start rather than run with an unsafe setting.
 
 **Personal data** — in this project: email, phone, first name, last name, date
 of birth, IP address, payment details, and **any free text a user typed** —
-including campaign titles, character names and every message. Explicitly *not*
+including campaign titles, character names and every message. Explicitly _not_
 personal here: username and display name.
 
 **Plaintext** — readable data, before encryption or after decryption.
@@ -165,13 +165,13 @@ copy of that column's contents, which is why indexing personal data would
 quietly duplicate the thing you are protecting.
 
 **Primary key** — the column uniquely identifying a row. **Foreign key** — a
-column pointing at another table's primary key. The *absence* of a foreign key
+column pointing at another table's primary key. The _absence_ of a foreign key
 between analytics and identity is deliberate and load-bearing here.
 
 **Stored procedure** — SQL stored inside the database and called by name.
 
 **ORM (Object Relational Mapper)** — a library turning database rows into
-objects. Encryption in this project sits deliberately *above* it.
+objects. Encryption in this project sits deliberately _above_ it.
 
 **Transaction** — a group of changes that all happen or none do.
 
@@ -225,7 +225,7 @@ encryption key.
 resource.
 
 **Egress IP** — the address your outbound traffic appears to come from.
-Distinct from the address people connect *to*, which catches many people out.
+Distinct from the address people connect _to_, which catches many people out.
 
 **OIDC (OpenID Connect)** — a way for one system to prove its identity to
 another without a shared password. Lets Fly.io machines get short-lived AWS
@@ -270,5 +270,25 @@ down.
 whether an attempt succeeds.
 
 **Hit points** — how much damage a character can take before falling.
+
+**Polyhedral dice** — the set of oddly shaped dice the game uses, named by how
+many sides each has: **d4**, **d6**, **d8**, **d10**, **d12** and **d20**. A
+**d100** is a d10 read in tens, so two of them give a number from 1 to 100.
+Written as `2d6+3`, meaning "roll two six-sided dice and add three".
+
+**d20** — the twenty-sided die, and the one the rules ask for by default. Every
+ability check, attack and saving throw is a d20 roll.
+
+**Natural 20 / natural 1** — a d20 showing 20 or 1 before any modifier is
+added. A natural 20 on an attack always hits; a natural 1 always misses. Both
+are moments the whole table reacts to, which is why the interface marks them.
+
+**Advantage** — the rules' way of saying "this is easier than usual": roll two
+d20 and keep the **higher**. **Disadvantage** is the reverse — roll two and
+keep the **lower**. They apply to a d20 only; there is no such thing as rolling
+damage with advantage.
+
+**Modifier** — the number added to or taken from a roll, from a character's
+ability scores and training. A roll of 14 with a +3 modifier totals 17.
 
 **D&D 5e** — the fifth edition of Dungeons & Dragons, the ruleset used here.

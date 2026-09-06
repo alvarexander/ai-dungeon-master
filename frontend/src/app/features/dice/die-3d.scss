@@ -1,0 +1,249 @@
+/**
+ * The 3D die.
+ *
+ * Three CSS properties do the heavy lifting here, and it is worth knowing what
+ * each of them is for:
+ *
+ * - **`perspective`** on the stage is what makes this three-dimensional rather
+ *   than a flat shape being spun. It decides how strongly parts of the die
+ *   further away appear to shrink. A small number exaggerates the effect; a
+ *   large number flattens it.
+ * - **`transform-style: preserve-3d`** on the die tells the browser to keep the
+ *   faces as things standing in space, instead of squashing them flat onto
+ *   their parent. Without it every face would land in the same plane and the
+ *   die would collapse into a badge.
+ * - **`backface-visibility: hidden`** hides a face once it has turned away from
+ *   you. That is what stops the numbers on the far side of the die showing
+ *   through the near side like a lightbox.
+ *
+ * Everything else — where each face goes, what shape it is, how it is shaded —
+ * arrives as inline styles from the component, because it is arithmetic rather
+ * than design.
+ */
+
+.stage {
+    position: relative;
+    display: grid;
+    place-items: center;
+    /* Close enough to give a real sense of depth, far enough that the die does
+     not look like it is being viewed through a fisheye lens. */
+    perspective: 620px;
+}
+
+.die {
+    position: absolute;
+    /* A single point at the centre of the stage. Every face is turned and then
+     pushed outwards from here, so this is the middle of the die. */
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    transform-style: preserve-3d;
+    /* Long enough to see the die turn to its answer, short enough not to keep
+     anyone waiting for it. */
+    transition: transform 640ms cubic-bezier(0.22, 1.2, 0.36, 1);
+}
+
+/* ---------------------------------------------------------------------
+   One face
+   --------------------------------------------------------------------- */
+
+.face {
+    position: absolute;
+    top: 0;
+    left: 0;
+    /* Turns happen about the centre of the die, not the centre of the face. */
+    transform-origin: 0 0;
+    backface-visibility: hidden;
+    clip-path: var(--clip);
+
+    /* The face's colour is the edge colour; the inset below paints over the
+     middle of it, leaving a hairline rim. That rim is what makes the die look
+     cut and faceted rather than moulded in one piece. */
+    background: color-mix(in srgb, var(--accent) 60%, var(--surface-sunken));
+}
+
+/*
+  The lit surface of the face, very slightly smaller than the face itself.
+
+  `--shade` comes from the component: 1 for a face turned towards the light,
+  about 0.45 for one turned away. Mixing the two surface colours by it gives the
+  facets their separation.
+*/
+.face::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    clip-path: var(--clip);
+    transform: scale(0.94);
+    background: color-mix(
+        in srgb,
+        var(--surface-raised) calc(var(--shade) * 100%),
+        color-mix(in srgb, var(--surface-sunken) 70%, #000)
+    );
+}
+
+/* The number, sitting where the component worked out the middle of the face to
+   be — which is not the middle of the box for a kite-shaped d10 face. */
+.pip {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    font-family: var(--font-narrative);
+    font-weight: 700;
+    line-height: 1;
+    color: var(--ink);
+    /* The digits are small on a d20; a faint shadow keeps them off the
+     background of their own facet. */
+    text-shadow: 0 1px 2px color-mix(in srgb, #000 45%, transparent);
+    user-select: none;
+    white-space: nowrap;
+}
+
+/* A 6 and a 9 are the same glyph turned around, so dice underline them. */
+.pip--underlined {
+    text-decoration: underline;
+    text-underline-offset: 1px;
+}
+
+/* The face that is showing when the die stops. Brightening it is what draws
+   the eye to the answer without needing a separate number on top. */
+.face--winning::before {
+    background: color-mix(in srgb, var(--accent) 30%, var(--surface-raised));
+}
+
+.face--winning .pip {
+    color: var(--ink);
+}
+
+.die--critical .face--winning::before {
+    background: color-mix(in srgb, var(--accent-strong) 55%, var(--surface-raised));
+}
+
+.die--fumble .face--winning::before {
+    background: color-mix(in srgb, var(--danger) 45%, var(--surface-raised));
+}
+
+/* ---------------------------------------------------------------------
+   The throw
+   --------------------------------------------------------------------- */
+
+/*
+  Every number in here arrives from the component as a custom property, because
+  the dice do not all move the same way. A d4 tips over and stops; a d20 rolls
+  like a marble. See `MOTION` in `die-3d.ts` for what each die does and why.
+
+  Two things make the landing clean:
+
+  1. The turns are whole multiples of 360 degrees, and the animation starts
+     exactly that far back from where the die will finish. So the last frame is
+     the resting position, and when the animation comes off nothing jumps.
+  2. `--bounce` is in pixels rather than a percentage. The die is a single
+     point with no width, and a percentage of nothing is nothing.
+*/
+.stage--rolling .die {
+    animation: throw-die var(--tumble-ms, 1100ms) linear forwards;
+}
+
+@keyframes throw-die {
+    /* Dropping in, spinning fast. */
+    0% {
+        transform: translateY(calc(var(--bounce) * -1.7)) rotateX(calc(var(--rest-x) - var(--turn-x)))
+            rotateY(calc(var(--rest-y) - var(--turn-y))) scale(0.9);
+        animation-timing-function: cubic-bezier(0.35, 0, 0.7, 1);
+    }
+
+    /* First impact. Most of the spin is already spent. */
+    26% {
+        transform: translateY(0) rotateX(calc(var(--rest-x) - var(--turn-x) * 0.52))
+            rotateY(calc(var(--rest-y) - var(--turn-y) * 0.52)) scale(1.02);
+        animation-timing-function: cubic-bezier(0.2, 0.7, 0.4, 1);
+    }
+
+    /* Up off the table again, lower and slower. */
+    47% {
+        transform: translateY(calc(var(--bounce) * -0.85)) rotateX(calc(var(--rest-x) - var(--turn-x) * 0.26))
+            rotateY(calc(var(--rest-y) - var(--turn-y) * 0.26)) scale(1);
+        animation-timing-function: cubic-bezier(0.6, 0, 0.85, 1);
+    }
+
+    /* Second impact. */
+    68% {
+        transform: translateY(0) rotateX(calc(var(--rest-x) - var(--turn-x) * 0.1))
+            rotateY(calc(var(--rest-y) - var(--turn-y) * 0.1)) scale(1);
+        animation-timing-function: cubic-bezier(0.25, 0.7, 0.45, 1);
+    }
+
+    /* A last small hop, the way a die rocks once before it settles. */
+    84% {
+        transform: translateY(calc(var(--bounce) * -0.22)) rotateX(calc(var(--rest-x) - var(--turn-x) * 0.028))
+            rotateY(calc(var(--rest-y) - var(--turn-y) * 0.028)) scale(1);
+        animation-timing-function: cubic-bezier(0.6, 0, 0.9, 1);
+    }
+
+    /* Down, still, and showing the number it rolled. */
+    100% {
+        transform: translateY(0) rotateX(var(--rest-x)) rotateY(var(--rest-y)) scale(1);
+    }
+}
+
+/*
+  A glow behind the die on a natural 20 or a natural 1 — the moment the whole
+  table looks up.
+
+  It is a separate element sitting behind the die rather than a `filter` on the
+  die itself, and that is not a stylistic preference. **Any `filter` on an
+  element forces the browser to flatten its 3D children**, so a `drop-shadow`
+  on the die collapsed the whole polyhedron into a flat, squashed hexagon —
+  but only on a 20 or a 1, which is exactly the kind of bug that survives
+  casual testing. A drawn halo cannot do that, and it reads better anyway:
+  light on the table rather than an outline traced round the die.
+*/
+.halo {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 100%;
+    height: 100%;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 320ms ease;
+}
+
+.halo--critical,
+.halo--fumble {
+    opacity: 1;
+    animation: halo-in 520ms cubic-bezier(0.22, 1.3, 0.36, 1);
+}
+
+.halo--critical {
+    background: radial-gradient(circle, color-mix(in srgb, var(--accent-strong) 55%, transparent), transparent 68%);
+}
+
+.halo--fumble {
+    background: radial-gradient(circle, color-mix(in srgb, var(--danger) 45%, transparent), transparent 68%);
+}
+
+@keyframes halo-in {
+    from {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(0.5);
+    }
+    to {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1);
+    }
+}
+
+/* Motion here is the whole feature, so it is shortened rather than removed for
+   people who have asked for less of it — a die that does not move at all is
+   just a number, and the roll would appear not to have happened. */
+@media (prefers-reduced-motion: reduce) {
+    .stage--rolling .die {
+        animation-duration: 240ms;
+    }
+    .die {
+        transition-duration: 160ms;
+    }
+}

@@ -1,0 +1,179 @@
+<!--
+  The dice tray.
+
+  The panel is `role="dialog"` so a screen reader announces it as a thing that
+  opened, and Escape closes it — both of which people expect from anything that
+  appears over the page.
+-->
+
+@if (open()) {
+    <div class="backdrop" (click)="close()" aria-hidden="true"></div>
+
+    <section class="tray" role="dialog" aria-label="Dice" (keydown.escape)="close()" tabindex="-1">
+        <header class="tray__head">
+            <h2>Dice</h2>
+            <button type="button" class="icon-btn" (click)="close()">
+                <app-icon name="close" [size]="18" label="Close dice" />
+            </button>
+        </header>
+
+        <!-- The die itself -->
+        <div class="tray__stage">
+            <app-die-3d
+                [type]="die()"
+                [roll]="shownRoll()"
+                [radius]="66"
+                [rolling]="rolling()"
+                [hasResult]="result() !== null"
+                [critical]="result()?.critical ?? false"
+                [fumble]="result()?.fumble ?? false"
+            />
+
+            <!--
+          The die shows what came up on the die. The total is a different
+          number as soon as there is a modifier or more than one die, so it
+          gets its own place rather than being painted onto a face that does
+          not exist.
+        -->
+            @if (result(); as outcome) {
+                @if (!rolling()) {
+                    <p class="tray__total">
+                        <span class="tray__total-label small muted">Total</span>
+                        <span class="tray__total-value">{{ outcome.total }}</span>
+                    </p>
+                }
+            }
+        </div>
+
+        <!-- What happened -->
+        @if (result(); as outcome) {
+            @if (!rolling()) {
+                <div class="outcome" aria-live="polite">
+                    @if (outcome.critical) {
+                        <p class="outcome__flag outcome__flag--crit">Natural 20</p>
+                    } @else if (outcome.fumble) {
+                        <p class="outcome__flag outcome__flag--fumble">Natural 1</p>
+                    }
+
+                    <p class="outcome__detail small muted">
+                        @if (outcome.mode !== 'normal') {
+                            <span class="outcome__mode">{{ outcome.mode }}</span>
+                            rolled {{ outcome.rolls[0] }},
+                            <span class="outcome__dropped">discarded {{ outcome.discarded[0] }}</span>
+                        } @else if (outcome.rolls.length > 1) {
+                            rolled {{ outcome.rolls.join(' + ') }}
+                        } @else {
+                            rolled {{ outcome.rolls[0] }}
+                        }
+                        @if (outcome.modifier !== 0) {
+                            <span> {{ outcome.modifier > 0 ? '+' : '−' }} {{ abs(outcome.modifier) }} </span>
+                        }
+                    </p>
+
+                    <button type="button" class="btn btn--primary btn--block" (click)="tellTheDungeonMaster()">
+                        Tell the Dungeon Master
+                    </button>
+                </div>
+            }
+        }
+
+        <!-- Which die -->
+        <fieldset class="group">
+            <legend class="group__label">Die</legend>
+            <div class="dice-grid">
+                @for (type of dieTypes; track type) {
+                    <button
+                        type="button"
+                        class="die-chip"
+                        [class.die-chip--on]="die() === type"
+                        (click)="chooseDie(type)"
+                        [attr.aria-pressed]="die() === type"
+                    >
+                        {{ type }}
+                    </button>
+                }
+            </div>
+        </fieldset>
+
+        <!-- Advantage, only where the rules define it -->
+        @if (supportsAdvantage()) {
+            <fieldset class="group">
+                <legend class="group__label">Roll with</legend>
+                <div class="row row--wrap">
+                    <button
+                        type="button"
+                        class="mode-chip mode-chip--adv"
+                        [class.mode-chip--on]="mode() === 'advantage'"
+                        (click)="toggleMode('advantage')"
+                        [attr.aria-pressed]="mode() === 'advantage'"
+                    >
+                        <app-icon name="arrow_upward" [size]="14" />
+                        Advantage
+                    </button>
+                    <button
+                        type="button"
+                        class="mode-chip mode-chip--dis"
+                        [class.mode-chip--on]="mode() === 'disadvantage'"
+                        (click)="toggleMode('disadvantage')"
+                        [attr.aria-pressed]="mode() === 'disadvantage'"
+                    >
+                        <app-icon name="arrow_downward" [size]="14" />
+                        Disadvantage
+                    </button>
+                </div>
+                <p class="group__hint small muted">
+                    Rolls two dice and takes the
+                    {{ mode() === 'disadvantage' ? 'worse' : 'better' }}. Press again to clear.
+                </p>
+            </fieldset>
+        }
+
+        <!-- How many, and what to add -->
+        <div class="steppers">
+            @if (mode() === 'normal') {
+                <div class="stepper">
+                    <span class="stepper__label small muted">How many</span>
+                    <div class="stepper__controls">
+                        <button type="button" class="icon-btn" (click)="adjustCount(-1)" [disabled]="count() <= 1">
+                            <app-icon name="remove" [size]="16" label="One fewer die" />
+                        </button>
+                        <span class="stepper__value mono">{{ count() }}</span>
+                        <button type="button" class="icon-btn" (click)="adjustCount(1)" [disabled]="count() >= 20">
+                            <app-icon name="add" [size]="16" label="One more die" />
+                        </button>
+                    </div>
+                </div>
+            }
+
+            <div class="stepper">
+                <span class="stepper__label small muted">Modifier</span>
+                <div class="stepper__controls">
+                    <button type="button" class="icon-btn" (click)="adjustModifier(-1)">
+                        <app-icon name="remove" [size]="16" label="Lower the modifier" />
+                    </button>
+                    <span class="stepper__value mono"> {{ modifier() > 0 ? '+' : '' }}{{ modifier() }} </span>
+                    <button type="button" class="icon-btn" (click)="adjustModifier(1)">
+                        <app-icon name="add" [size]="16" label="Raise the modifier" />
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <button type="button" class="btn btn--primary btn--block roll-btn" (click)="rollDice()" [disabled]="rolling()">
+            <app-icon name="casino" [size]="18" />
+            {{ rolling() ? 'Rolling…' : 'Roll ' + notation() }}
+        </button>
+    </section>
+}
+
+<!-- The floating button that opens all of the above -->
+<button
+    type="button"
+    class="fab"
+    [class.fab--open]="open()"
+    (click)="toggle()"
+    [attr.aria-expanded]="open()"
+    title="Dice"
+>
+    <app-icon [name]="open() ? 'close' : 'casino'" [size]="24" [label]="open() ? 'Close dice' : 'Open dice'" />
+</button>

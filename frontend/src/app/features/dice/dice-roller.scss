@@ -1,0 +1,401 @@
+/**
+ * The dice tray.
+ *
+ * Everything here animates in and out. A panel that appears instantly reads as
+ * a glitch; one that grows from the button it came from reads as a drawer
+ * opening, and the player keeps track of where they are without thinking
+ * about it.
+ */
+
+.fab {
+    position: fixed;
+    right: var(--space-5);
+    bottom: var(--space-5);
+    z-index: 40;
+
+    display: grid;
+    place-items: center;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    border: 1px solid var(--accent);
+    background: var(--accent);
+    color: var(--accent-ink);
+    box-shadow: var(--shadow-lg);
+    cursor: pointer;
+
+    transition:
+        transform 220ms cubic-bezier(0.22, 1.3, 0.36, 1),
+        background 180ms ease,
+        box-shadow 180ms ease;
+
+    &:hover {
+        transform: translateY(-2px) scale(1.05);
+        box-shadow: 0 14px 34px color-mix(in srgb, var(--accent) 35%, transparent);
+    }
+
+    &:active {
+        transform: translateY(0) scale(0.96);
+    }
+
+    /* Rotates into the close icon, so opening and closing feel like one
+     control rather than two that swap places. */
+    &--open {
+        transform: rotate(135deg);
+        background: var(--surface-raised);
+        color: var(--ink);
+        border-color: var(--border-strong);
+
+        &:hover {
+            transform: rotate(135deg) scale(1.05);
+        }
+    }
+}
+
+.backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 38;
+    background: rgba(0, 0, 0, 0.45);
+    backdrop-filter: blur(2px);
+    animation: fade-in 180ms ease;
+}
+
+.tray {
+    position: fixed;
+    right: var(--space-5);
+    bottom: calc(var(--space-5) + 68px);
+    z-index: 39;
+
+    width: min(340px, calc(100vw - var(--space-5) * 2));
+    max-height: min(78vh, 680px);
+    overflow-y: auto;
+
+    padding: var(--space-4);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-lg);
+    background: var(--surface);
+    box-shadow: var(--shadow-lg);
+
+    /* Grows from the bottom-right corner, where the button is. */
+    transform-origin: bottom right;
+    animation: tray-in 260ms cubic-bezier(0.22, 1.3, 0.36, 1);
+
+    &__head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: var(--space-3);
+
+        h2 {
+            margin: 0;
+            font-family: var(--font-narrative);
+            font-size: 1.2rem;
+        }
+    }
+
+    &__stage {
+        display: grid;
+        place-items: center;
+        padding: var(--space-4) 0;
+        margin-bottom: var(--space-2);
+        border-radius: var(--radius);
+        background:
+            radial-gradient(ellipse at center, color-mix(in srgb, var(--accent) 10%, transparent), transparent 70%),
+            var(--surface-sunken);
+    }
+
+    /* The total sits beside the die rather than on it. The die shows what came
+     up on the die; adding a modifier changes the total but not the die. */
+    &__total {
+        display: flex;
+        align-items: baseline;
+        gap: var(--space-2);
+        margin: var(--space-2) 0 0;
+        animation: land 380ms cubic-bezier(0.22, 1.5, 0.36, 1);
+    }
+
+    &__total-label {
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+    }
+
+    &__total-value {
+        font-family: var(--font-narrative);
+        font-size: 1.9rem;
+        font-weight: 700;
+        line-height: 1;
+        color: var(--ink);
+    }
+}
+
+@keyframes land {
+    from {
+        opacity: 0;
+        transform: scale(0.6);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+@keyframes tray-in {
+    from {
+        opacity: 0;
+        transform: scale(0.82) translateY(12px);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+@keyframes fade-in {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+/* ---------------------------------------------------------------------
+   The result
+   --------------------------------------------------------------------- */
+
+.outcome {
+    margin-bottom: var(--space-4);
+    text-align: center;
+    animation: rise 260ms cubic-bezier(0.22, 1.3, 0.36, 1);
+
+    &__flag {
+        margin: 0 0 var(--space-1);
+        font-family: var(--font-narrative);
+        font-size: 1rem;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+
+        &--crit {
+            color: var(--accent-strong);
+        }
+        &--fumble {
+            color: var(--danger);
+        }
+    }
+
+    &__detail {
+        margin: 0 0 var(--space-3);
+    }
+
+    &__mode {
+        color: var(--accent-strong);
+        text-transform: capitalize;
+    }
+
+    /* The die that did not count, shown struck through — you can see what you
+     dodged, which is most of the pleasure of advantage. */
+    &__dropped {
+        text-decoration: line-through;
+        opacity: 0.6;
+    }
+}
+
+@keyframes rise {
+    from {
+        opacity: 0;
+        transform: translateY(8px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* ---------------------------------------------------------------------
+   Controls
+   --------------------------------------------------------------------- */
+
+.group {
+    border: none;
+    padding: 0;
+    margin: 0 0 var(--space-4);
+
+    &__label {
+        padding: 0;
+        margin-bottom: var(--space-2);
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.07em;
+        color: var(--ink-faint);
+    }
+
+    &__hint {
+        margin: var(--space-2) 0 0;
+    }
+}
+
+.dice-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: var(--space-2);
+}
+
+.die-chip {
+    padding: 8px 4px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius);
+    background: var(--surface-sunken);
+    color: var(--ink-muted);
+    font: inherit;
+    font-family: var(--font-narrative);
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition:
+        transform 140ms cubic-bezier(0.22, 1.3, 0.36, 1),
+        border-color 140ms ease,
+        color 140ms ease,
+        background 140ms ease;
+
+    &:hover {
+        transform: translateY(-2px);
+        border-color: var(--accent);
+        color: var(--ink);
+    }
+
+    &--on {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: var(--accent-ink);
+        font-weight: 700;
+    }
+}
+
+.mode-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 6px 12px;
+    border: 1px solid var(--border-strong);
+    border-radius: 999px;
+    background: transparent;
+    color: var(--ink-muted);
+    font: inherit;
+    font-size: 0.82rem;
+    cursor: pointer;
+    transition:
+        border-color 140ms ease,
+        color 140ms ease,
+        background 140ms ease;
+
+    &--adv.mode-chip--on {
+        background: var(--success-bg);
+        border-color: var(--success);
+        color: var(--success);
+        font-weight: 600;
+    }
+
+    &--dis.mode-chip--on {
+        background: var(--danger-bg);
+        border-color: var(--danger);
+        color: var(--danger);
+        font-weight: 600;
+    }
+
+    &:hover:not(.mode-chip--on) {
+        color: var(--ink);
+        border-color: var(--accent);
+    }
+}
+
+.steppers {
+    display: flex;
+    gap: var(--space-4);
+    margin-bottom: var(--space-4);
+}
+
+.stepper {
+    flex: 1;
+
+    &__label {
+        display: block;
+        margin-bottom: var(--space-2);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        font-size: 0.72rem;
+    }
+
+    &__controls {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--space-2);
+        padding: 4px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        background: var(--surface-sunken);
+    }
+
+    &__value {
+        min-width: 2.5ch;
+        text-align: center;
+        font-size: 1rem;
+    }
+}
+
+.icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px;
+    border: none;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--ink-muted);
+    cursor: pointer;
+    transition:
+        color 140ms ease,
+        background 140ms ease;
+
+    &:hover:not(:disabled) {
+        color: var(--accent-strong);
+        background: var(--surface-raised);
+    }
+
+    &:disabled {
+        opacity: 0.35;
+        cursor: not-allowed;
+    }
+}
+
+.roll-btn {
+    font-family: var(--font-narrative);
+    font-size: 1rem;
+    letter-spacing: 0.02em;
+}
+
+@media (max-width: 600px) {
+    .tray {
+        right: var(--space-3);
+        left: var(--space-3);
+        width: auto;
+    }
+    .fab {
+        right: var(--space-3);
+        bottom: var(--space-3);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .fab,
+    .die-chip,
+    .mode-chip,
+    .icon-btn {
+        transition: none;
+    }
+    .tray,
+    .backdrop,
+    .outcome {
+        animation: none;
+    }
+}

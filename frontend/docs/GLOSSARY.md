@@ -104,7 +104,7 @@ with dependencies replaced.
 ## Tooling
 
 **Node.js** — the program that runs JavaScript outside a browser. Used only to
-*build* this application, never to run it.
+_build_ this application, never to run it.
 
 **npm** — the package manager. `npm install` fetches libraries;
 `npm start` runs the development server.
@@ -152,6 +152,23 @@ used instead of a literal.
 
 **Measure** — the maximum comfortable line length for reading, set to 68
 characters.
+
+**Floating action button (FAB)** — a round button that hovers over the page
+rather than sitting in the layout, used for one thing the user might want at
+any moment. Here it is the dice tray.
+
+**Face placement** — where one face of a die goes: the two turns that point it
+the right way, how far out from the centre it sits, and the outline that cuts
+it to shape. Computed in `core/dice/polyhedra.ts` from the corners of the
+solid.
+
+**Resting angle** — the turn that brings the face a die rolled round to face
+the viewer, so the die stops showing the number it actually rolled.
+
+**Preserve-3d** — the CSS setting that tells the browser to keep an element's
+children standing in space instead of flattening them onto their parent. It is
+what makes the dice solid rather than a badge. Note that applying a **CSS
+filter** to an element cancels it for that element's children.
 
 ---
 

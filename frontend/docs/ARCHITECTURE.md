@@ -22,8 +22,15 @@ main.ts                     fetches config.json, then starts Angular
 ```
 
 Everything under `core/` is shared machinery: the API client, the interceptors,
-the signal stores, and the voice recorder. Everything under `shared/ui/` is a
-reusable piece of interface.
+the signal stores, the voice recorder, and the dice.
+
+The dice are worth a note, because they are the clearest example of a pattern
+used throughout: `core/dice/dice.ts` holds the rules and `core/dice/polyhedra.ts`
+holds the geometry, both as plain functions that know nothing about Angular or
+the browser. `features/dice/` turns their output into a spinning die. That
+split is what lets the shape of a d20 be tested by a test that renders nothing.
+
+Everything under `shared/ui/` is a reusable piece of interface.
 
 **Feature folders do not import from each other.** If two need the same thing,
 it belongs in `core/` or `shared/`.
@@ -50,12 +57,12 @@ be got right.
 
 ### The four stores
 
-| Store | Holds | Notable behaviour |
-|---|---|---|
-| `SessionStore` | Who is signed in, the token | Obtains the XSRF token at startup |
-| `ChatStore` | The conversation, waiting state, errors | Optimistic messages; returns text on failure |
-| `CampaignStore` | Campaigns and characters | Sorts by title **in the browser** |
-| `SettingsStore` | Preferences | An `effect` applies the theme automatically |
+| Store           | Holds                                   | Notable behaviour                            |
+| --------------- | --------------------------------------- | -------------------------------------------- |
+| `SessionStore`  | Who is signed in, the token             | Obtains the XSRF token at startup            |
+| `ChatStore`     | The conversation, waiting state, errors | Optimistic messages; returns text on failure |
+| `CampaignStore` | Campaigns and characters                | Sorts by title **in the browser**            |
+| `SettingsStore` | Preferences                             | An `effect` applies the theme automatically  |
 
 They are `providedIn: 'root'`, so there is exactly one of each and state
 survives navigation. Going to Settings and back does not lose the conversation.
@@ -122,15 +129,15 @@ commit.
 credentials  →  xsrf  →  auth  →  error  →  the network
 ```
 
-| Interceptor | Does | Why it is where it is |
-|---|---|---|
-| `credentials` | Sets `withCredentials` for our API | Must run first, so the browser is told to include cookies before anything reads them |
-| `xsrf` | Reads the token cookie, sets the header | Needs the cookie that `credentials` enabled |
-| `auth` | Adds the `Authorization` header | Independent; grouped with the other outgoing work |
-| `error` | Normalises every failure | Outermost on the way back, so it sees failures from all of the above |
+| Interceptor   | Does                                    | Why it is where it is                                                                |
+| ------------- | --------------------------------------- | ------------------------------------------------------------------------------------ |
+| `credentials` | Sets `withCredentials` for our API      | Must run first, so the browser is told to include cookies before anything reads them |
+| `xsrf`        | Reads the token cookie, sets the header | Needs the cookie that `credentials` enabled                                          |
+| `auth`        | Adds the `Authorization` header         | Independent; grouped with the other outgoing work                                    |
+| `error`       | Normalises every failure                | Outermost on the way back, so it sees failures from all of the above                 |
 
 Each is scoped to the configured API address. Attaching a session token or
-`withCredentials` to *every* request would hand credentials to any third party
+`withCredentials` to _every_ request would hand credentials to any third party
 the application ever calls.
 
 ---

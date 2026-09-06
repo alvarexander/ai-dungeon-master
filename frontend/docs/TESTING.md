@@ -14,20 +14,20 @@ Tests are `*.spec.ts` beside the code they test.
 
 ## What gets mocked, and what does not
 
-| Thing | Mocked? | Why |
-|---|---|---|
-| `HttpClient` / `ApiClient` | **Yes** | A test must never make a real request: slow, flaky, spends AI quota, sends test content to a third party |
-| `fetch` for `config.json` | **Yes** | Stubbed per test so failure paths can be exercised |
-| Signal stores | **No** | They are the logic under test |
-| Pure functions | **No** | Nothing to mock |
-| `document.cookie` | **No** | jsdom provides a real one |
-| `MediaRecorder` / `getUserMedia` | Not tested | jsdom has no audio. Verified by hand — see below |
+| Thing                            | Mocked?    | Why                                                                                                      |
+| -------------------------------- | ---------- | -------------------------------------------------------------------------------------------------------- |
+| `HttpClient` / `ApiClient`       | **Yes**    | A test must never make a real request: slow, flaky, spends AI quota, sends test content to a third party |
+| `fetch` for `config.json`        | **Yes**    | Stubbed per test so failure paths can be exercised                                                       |
+| Signal stores                    | **No**     | They are the logic under test                                                                            |
+| Pure functions                   | **No**     | Nothing to mock                                                                                          |
+| `document.cookie`                | **No**     | jsdom provides a real one                                                                                |
+| `MediaRecorder` / `getUserMedia` | Not tested | jsdom has no audio. Verified by hand — see below                                                         |
 
 The general rule: **mock the boundary, test everything inside it.**
 
 ---
 
-## What the 18 tests prove
+## What the 52 tests prove
 
 ### `xsrf.interceptor.spec.ts`
 
@@ -68,6 +68,44 @@ configuration problem.
   their words were sent to Google.
 - Changing campaign clears the conversation.
 
+### `dice.spec.ts`
+
+The rules of rolling, which are arithmetic and so can be pinned down exactly.
+
+- **Every face of a d20 is reachable.** 4,000 rolls must produce all 20 values.
+  A die that never rolls a 20 is broken, and this is the cheapest way to catch
+  an off-by-one in the modulo.
+- **Advantage really takes the higher of two**, checked over 200 rolls rather
+  than once, and the discarded die is kept.
+- **The modifier is applied once, not once per die.** `3d6+5` is easy to write
+  as `+5` three times.
+- Advantage is ignored on dice where the rules do not define it.
+- A critical is flagged only on a single d20 — eight d6 for a fireball totalling
+  20 is not a critical hit.
+
+### `polyhedra.spec.ts`
+
+The shapes of the dice. These are the kind of thing that looks almost right
+when it is wrong, so the properties that make a solid a solid are checked
+directly rather than left to the eye.
+
+- **Every die has the number of faces its name promises.** A d20 with nineteen
+  faces is the reason the file exists.
+- **Every face has the right number of corners** — triangles for the d4, d8 and
+  d20, squares for the d6, kites for the d10, pentagons for the d12.
+- **Every face of a die is the same size and the same distance from the
+  centre.** If the derivation picks up a stray corner, one face comes out
+  bigger. This is the test that caught the original wrong-shapes bug, and it is
+  the reason that bug did not ship.
+- **Roll a 17, see the 17** — checked for every face of every die.
+- Opposite faces add up to one more than the number of sides, the way
+  manufactured dice are numbered.
+
+That last group is worth dwelling on. Nothing here renders anything, and yet it
+is a genuine test of what appears on screen — because the geometry was made a
+pure function first, and only then turned into styles. Anything that could only
+be checked by looking at it would not have been checked at all.
+
 ---
 
 ## Writing a test
@@ -82,12 +120,12 @@ For a store, provide a fake `ApiClient` through `TestBed`:
 
 ```typescript
 class FakeApiClient {
-  post = vi.fn();
-  get = vi.fn();
+    post = vi.fn();
+    get = vi.fn();
 }
 
 TestBed.configureTestingModule({
-  providers: [ChatStore, { provide: ApiClient, useValue: api }],
+    providers: [ChatStore, { provide: ApiClient, useValue: api }]
 });
 ```
 

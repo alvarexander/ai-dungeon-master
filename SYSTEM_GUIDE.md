@@ -58,25 +58,25 @@ The frontend's copy of these shapes is `frontend/src/app/core/api/api.types.ts`.
 
 ### The endpoints
 
-| Method | Path | Purpose | Status |
-|---|---|---|---|
-| GET | `/health` | Is the process alive? | Working |
-| GET | `/health/ready` | Is it configured correctly? | Working |
-| GET | `/api/v1/auth/csrf` | Fetch the XSRF token | Working |
-| POST | `/api/v1/auth/register` | Create an account | Real, except the session |
-| POST | `/api/v1/auth/login` | Sign in | Real, except the session |
-| POST | `/api/v1/auth/logout` | Sign out | Working |
-| GET | `/api/v1/auth/me` | The current account | Working |
-| POST | `/api/v1/chat/turn` | **Say something to the DM** | **Working** |
-| GET | `/api/v1/chat/sessions/{id}/messages` | Read a conversation | Working |
-| GET/POST | `/api/v1/campaigns` | List / create | Working |
-| GET/PATCH/DELETE | `/api/v1/campaigns/{id}` | One campaign | Working |
-| GET/POST | `/api/v1/campaigns/{id}/characters` | List / create | Working |
-| GET/PATCH/DELETE | `/api/v1/characters/{id}` | One character | Working |
-| GET/PATCH | `/api/v1/settings` | Preferences | Working |
-| GET | `/api/v1/account/activity` | The user's own activity log | Working |
-| POST | `/api/v1/account/delete` | **Delete the account and all its data** | **Working** |
-| POST | `/api/v1/voice/transcribe` | Audio to text, locally | Working |
+| Method           | Path                                  | Purpose                                 | Status                   |
+| ---------------- | ------------------------------------- | --------------------------------------- | ------------------------ |
+| GET              | `/health`                             | Is the process alive?                   | Working                  |
+| GET              | `/health/ready`                       | Is it configured correctly?             | Working                  |
+| GET              | `/api/v1/auth/csrf`                   | Fetch the XSRF token                    | Working                  |
+| POST             | `/api/v1/auth/register`               | Create an account                       | Real, except the session |
+| POST             | `/api/v1/auth/login`                  | Sign in                                 | Real, except the session |
+| POST             | `/api/v1/auth/logout`                 | Sign out                                | Working                  |
+| GET              | `/api/v1/auth/me`                     | The current account                     | Working                  |
+| POST             | `/api/v1/chat/turn`                   | **Say something to the DM**             | **Working**              |
+| GET              | `/api/v1/chat/sessions/{id}/messages` | Read a conversation                     | Working                  |
+| GET/POST         | `/api/v1/campaigns`                   | List / create                           | Working                  |
+| GET/PATCH/DELETE | `/api/v1/campaigns/{id}`              | One campaign                            | Working                  |
+| GET/POST         | `/api/v1/campaigns/{id}/characters`   | List / create                           | Working                  |
+| GET/PATCH/DELETE | `/api/v1/characters/{id}`             | One character                           | Working                  |
+| GET/PATCH        | `/api/v1/settings`                    | Preferences                             | Working                  |
+| GET              | `/api/v1/account/activity`            | The user's own activity log             | Working                  |
+| POST             | `/api/v1/account/delete`              | **Delete the account and all its data** | **Working**              |
+| POST             | `/api/v1/voice/transcribe`            | Audio to text, locally                  | Working                  |
 
 ### Rules that cross the boundary
 
@@ -107,21 +107,21 @@ Both halves must uphold this. The full picture is [PRIVACY.md](PRIVACY.md).
 
 ### What each side is responsible for
 
-| | Frontend | Backend |
-|---|---|---|
-| **Must never hold** | An API key, another user's data | A password in any recoverable form |
-| **Must never log** | Message content, email addresses | A credential, or a request body |
-| **Must never put in a URL** | Anything personal | Anything personal |
-| **Must always** | Show the correlation ID on failure; mark stubs on screen | Check ownership in every query; use named SQL parameters |
+|                             | Frontend                                                 | Backend                                                  |
+| --------------------------- | -------------------------------------------------------- | -------------------------------------------------------- |
+| **Must never hold**         | An API key, another user's data                          | A password in any recoverable form                       |
+| **Must never log**          | Message content, email addresses                         | A credential, or a request body                          |
+| **Must never put in a URL** | Anything personal                                        | Anything personal                                        |
+| **Must always**             | Show the correlation ID on failure; mark stubs on screen | Check ownership in every query; use named SQL parameters |
 
 ### What actually crosses the network
 
-| From | To | Carries | Protected by |
-|---|---|---|---|
-| Browser | Backend | Plaintext messages | TLS, XSRF, rate limits |
-| Browser | Backend | Raw audio | TLS. **Goes no further** |
-| Backend | Gemini | Scrubbed prompt text | TLS, SSRF allowlist. **Leaves your control** |
-| Backend | Database | Rows | TLS, one-address firewall |
+| From    | To       | Carries              | Protected by                                 |
+| ------- | -------- | -------------------- | -------------------------------------------- |
+| Browser | Backend  | Plaintext messages   | TLS, XSRF, rate limits                       |
+| Browser | Backend  | Raw audio            | TLS. **Goes no further**                     |
+| Backend | Gemini   | Scrubbed prompt text | TLS, SSRF allowlist. **Leaves your control** |
+| Backend | Database | Rows                 | TLS, one-address firewall                    |
 
 **The row that matters is the third.** Everything else stays inside the
 boundary. Prompts sent to Google do not, and on the free tier Google's terms
@@ -141,15 +141,15 @@ discarded. See [ADR-008](docs/DECISIONS_PRIVACY.md).
 Three tiers, three providers, in this order. Each depends on the one before, so
 this order makes every failure diagnosable in isolation.
 
-| Order | Tier | Guide |
-|---|---|---|
-| 1 | **MySQL — cheapest path** | [DEPLOY_MYSQL_HOSTINGER.md](docs/DEPLOY_MYSQL_HOSTINGER.md) — uses the database already included with your Hostinger plan. $0 |
-| 1 | **MySQL — fallback** | [DEPLOY_MYSQL_RDS.md](docs/DEPLOY_MYSQL_RDS.md) — free 12 months, then ~$14 |
-| — | **The cross-cloud problem** | [DEPLOY_CROSS_CLOUD.md](docs/DEPLOY_CROSS_CLOUD.md) — **only if you chose RDS.** Hostinger removes this problem entirely |
-| 2 | **Python on Fly.io** | [DEPLOY_PYTHON_FLYIO.md](docs/DEPLOY_PYTHON_FLYIO.md) |
-| 3 | **Angular on Hostinger** | [DEPLOY_ANGULAR_HOSTINGER.md](docs/DEPLOY_ANGULAR_HOSTINGER.md) |
-| 4 | **Cloudflare** | [CLOUDFLARE_WAF_PROMPT.md](CLOUDFLARE_WAF_PROMPT.md) |
-| — | CORS, secrets, TLS, rollback | [DEPLOY_CROSS_CUTTING.md](docs/DEPLOY_CROSS_CUTTING.md) |
+| Order | Tier                         | Guide                                                                                                                         |
+| ----- | ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| 1     | **MySQL — cheapest path**    | [DEPLOY_MYSQL_HOSTINGER.md](docs/DEPLOY_MYSQL_HOSTINGER.md) — uses the database already included with your Hostinger plan. $0 |
+| 1     | **MySQL — fallback**         | [DEPLOY_MYSQL_RDS.md](docs/DEPLOY_MYSQL_RDS.md) — free 12 months, then ~$14                                                   |
+| —     | **The cross-cloud problem**  | [DEPLOY_CROSS_CLOUD.md](docs/DEPLOY_CROSS_CLOUD.md) — **only if you chose RDS.** Hostinger removes this problem entirely      |
+| 2     | **Python on Fly.io**         | [DEPLOY_PYTHON_FLYIO.md](docs/DEPLOY_PYTHON_FLYIO.md)                                                                         |
+| 3     | **Angular on Hostinger**     | [DEPLOY_ANGULAR_HOSTINGER.md](docs/DEPLOY_ANGULAR_HOSTINGER.md)                                                               |
+| 4     | **Cloudflare**               | [CLOUDFLARE_WAF_PROMPT.md](CLOUDFLARE_WAF_PROMPT.md)                                                                          |
+| —     | CORS, secrets, TLS, rollback | [DEPLOY_CROSS_CUTTING.md](docs/DEPLOY_CROSS_CUTTING.md)                                                                       |
 
 **Nothing here has been deployed.** These are careful plans, not transcripts.
 The container images in particular have not been built — Docker was not
@@ -271,6 +271,6 @@ person using this will teach you more than any amount of further planning.
 **frontend/docs/** — [Architecture](frontend/docs/ARCHITECTURE.md) ·
 [Conventions](frontend/docs/CONVENTIONS.md) ·
 [UI patterns](frontend/docs/UI_PATTERNS.md) ·
-[Voice input](frontend/docs/VOICE_INPUT.md) ·
+[Voice input](frontend/docs/VOICE_INPUT.md) · [Dice](frontend/docs/DICE.md) ·
 [Testing](frontend/docs/TESTING.md) ·
 [Glossary](frontend/docs/GLOSSARY.md)
